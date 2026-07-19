@@ -15,13 +15,17 @@ Pipe your branch diff into `diffmsg` and get a clean conventional commit message
 ## usage
 
 ```bash
-git diff main.. | diffmsg
+diffmsg --ask
 ```
 
-or just run it and let it call `git diff` itself:
+`diffmsg` calls `git diff main...` itself and prints one commit title.
+Bare `diffmsg` prints the usage banner; the generation is an explicit
+`--ask`.
+
+planned, not implemented yet -- piping a diff in:
 
 ```bash
-diffmsg
+git diff main.. | diffmsg
 ```
 
 example output:
@@ -34,7 +38,7 @@ refactor(conversion): simplify logic and clean up comments
 * apply bulkification logic to trigger
 ```
 
-optionally specify a title style:
+planned, not implemented yet -- specifying a title style:
 
 ```bash
 git diff main.. | diffmsg --style conventional  # default
@@ -53,7 +57,7 @@ git diff main.. | diffmsg --style bracket
 ```bash
 brew install ollama
 ollama pull qwen2.5-coder:3b
-pip install diffmsg
+pipx install .   # from a local checkout; see RELEASING.md
 ```
 
 ## model
