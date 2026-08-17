@@ -1,5 +1,29 @@
 # diff-msg DESIGN
 
+## Role
+
+`diff-msg` is not the primary commit-message writer, and will not become
+one. The message is written by hand. This tool is for the moment that
+message will not come: it offers another suggestion, then another, until
+one of them knocks the right phrasing loose.
+
+That moment has a shape. It is the squash merge at the end of a branch
+that touched twenty files over three days. Naming that is a problem of
+summary, and it grows harder as the file count and the line count grow.
+Editor autocomplete solves the opposite case, a handful of lines just
+typed, one intent, with the whole editing session as context. Small
+commits are well served already, and there is nothing to add to them here.
+
+At that size there is also no single right answer. Which thread of a
+branch counts as the headline is a judgement call, and it belongs to
+whoever did the work. So the tool suggests, and never decides.
+
+The rest of the design follows from that. Five suggestions rather than
+one, because a single answer invites acceptance while a list invites
+choosing. Fresh sampling on every run, because a tool asked for another
+idea has to have one. No commit-format rules in the prompt, because the
+output is raw material and shaping it into a commit is the reader's job.
+
 ## Scope
 
 One person develops this, on one machine. No CI, no support matrix, no
@@ -99,29 +123,65 @@ Exit codes:
 All self-raised errors go to stderr as `diff-msg: <message>`; usage
 errors additionally print the usage line.
 
-## Determinism
+## Sampling
 
-The same diff should always produce the same title. The Ollama request
-pins `temperature: 0.0` and `seed: 42`, and the model is fixed at
-`qwen2.5-coder:3b`, small enough to run anywhere and deterministic
-enough to trust in a script. There is no configuration surface yet;
-changing the model means editing one constant.
+The same diff should produce a different set of suggestions on every run.
+It follows from Role: a second opinion pinned to one answer is not a
+second opinion.
+
+The request sets `temperature: 0.8` and sends no seed, so Ollama picks its
+own each time and the five titles move from run to run. The output is not
+reproducible, and for this tool that is the point.
+
+The model stays fixed at `qwen2.5-coder:3b`. A 3b model on an 8 GB machine
+answers in seconds, where an 8b model against a large diff spends its time
+swapping. Comprehension is genuinely better at 8b, and it is still the
+wrong trade when a whole diff has to fit in memory beside it. There is no
+configuration surface yet; changing the model means editing one constant.
 
 ## The Pipeline
 
 `main()` runs: parse args -> grammar guards (bare invocation, stdin)
 -> `get_branch` -> `get_diff` -> empty-diff early exit ->
-`build_prompt` -> `ask_ollama` -> print one title.
+`build_prompt` -> `ask_ollama` -> `format_suggestions` -> print.
 
 - `run_git` runs one git command via `subprocess` and hands back its
     stdout. See Git Failures for what it does when git fails.
 - `get_branch` and `get_diff` are thin wrappers over it, for
     `git branch --show-current` and `git diff main...`.
-- `build_prompt` wraps the branch name and diff in a fixed prompt instructing
-    the model to output exactly one conventional-commit-style title line.
-- `ask_ollama` POSTs to the local `/api/generate` endpoint. An unreachable
-    Ollama is reported as `diff-msg: cannot reach Ollama ...` on stderr
-    (exit 1), not a `requests` traceback.
+- `build_prompt` wraps the branch name and diff in a fixed prompt asking the
+    model for five one-line suggestions.
+- `ask_ollama` POSTs to the local `/api/generate` endpoint and returns the
+    five strings. An unreachable Ollama is reported as `diff-msg: cannot
+    reach Ollama ...` on stderr (exit 1), not a `requests` traceback.
+- `format_suggestions` numbers the list for printing.
+
+## Enforced Shape
+
+The request carries a JSON schema, so the reply is an object holding an
+array of exactly five strings, each capped at 100 characters. Ollama
+constrains generation to fit it.
+
+That moves the output contract out of the prompt and into the request. A
+rule written in prose is a request the model may decline, and it declined
+often: replies arrived wrapped in code fences, prefaced with "Here are
+five suggestions", closed with an offer of further assistance, or as one
+commit message with a body instead of five lines. None of those are
+expressible under the schema.
+
+The numbering is done in Python, not asked for. A model that cannot be
+relied on to count to five is not the right thing to ask for `1.` through
+`5.`.
+
+The length cap is the one part of the contract that needs saying twice. A
+`maxLength` clips a long line mid-word, so the model has to be asked for
+brevity as well as held to it. The schema is the backstop, not the
+instruction.
+
+The prompt also carries the rules that shape *content* rather than form:
+genuinely different suggestions, each naming the whole change rather than
+one file. Those cannot be schema-enforced, and they are the ones the model
+still gets wrong.
 
 ## Git Failures
 
@@ -145,15 +205,21 @@ own.
 
 ## Output Shape
 
-Exactly one commit title line on stdout:
+Five numbered suggestions on stdout, and nothing else:
 
 ```text
-refactor: simplify conversion logic and clean up comments
+1. simplify the conversion logic and clean up the comments
+2. rewrite conversion to drop the intermediate step
+3. tidy the converter and its comments
+4. collapse the conversion branches into one path
+5. clean up conversion and remove stale comments
 ```
 
-Prefix from `feat fix docs refactor test chore`, lowercase after
-the colon, 100 characters maximum, no body. The prompt enforces this;
-nothing post-processes the model output yet (see Open Questions).
+One line each, 100 characters maximum, both guaranteed by the schema. See
+Enforced Shape. No prefix, no scope, and no particular casing, since a
+suggestion is a plain sentence.
+
+A body is not part of this shape. The whole reply is titles.
 
 ## Open Questions
 
@@ -168,18 +234,41 @@ git diff main.. | diff-msg --style bracket
 
 - Configurable model and base branch (`main` is hardcoded in
   `git diff main...`).
-- Model output is trusted verbatim, with no validation that the reply is
-  actually one line, one prefix, under 100 chars.
-- `-t` / `-m` / `-tm` flags for title, body, or both
+- A body suggestion, and the `-t` / `-m` / `-tm` flags for title, body, or
+  both. Titles only for now.
 - `-v` verbose mode showing the full prompt
 - A giant diff goes into the prompt whole. Nothing truncates it, so a
   large branch can overrun the model's context.
+- Choosing the input by the kind of change. Full diff content suits code,
+  where the meaning is in the lines. File-level input (`git diff --numstat`,
+  paths and line counts only) suits prose, where the meaning is in which
+  files moved and by how much, and it carries no text for the model to
+  mistake for instructions. Deciding automatically, by file extension or by
+  diff size, is undesigned.
 
 ## Known Bugs
 
 Confirmed defects, recorded here until fixed.
 
-None currently open.
+### A prose-heavy diff hijacks the model
+
+A diff whose content reads as instructions gets followed instead of
+described. The model stops naming the change and starts answering the text
+it found inside it.
+
+Reproduced on a documentation branch whose diff edits a rules file: the
+five suggestions came back as advice about em-dashes, because the diff
+contained rules about em-dashes. Filenames get corrupted in the process,
+`CLAUDE.md` arriving as `CLAIDE.md` and `CLAUS.md`, which is the dangerous
+part. A wrong filename in a commit title looks right at a glance.
+
+Delimiting the diff and instructing the model to treat it as data does not
+fix it at 3b. It helps at 8b, which suggests the boundary is a capability
+the small model lacks rather than a prompt that needs rewording.
+
+This tool cannot describe its own repository, or any repository whose
+diffs are mostly prose. File-level input sidesteps it entirely, since a
+list of paths carries nothing to obey. See Open Questions.
 
 ## Use of AI
 

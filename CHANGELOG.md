@@ -6,6 +6,23 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-08-17
+
+### Added
+
+- a JSON schema on the Ollama request pins the reply to exactly five items,
+  each capped at 100 characters
+- a reply that escapes the schema exits 1 as `diff-msg: the model returned an
+  unusable reply`
+
+### Changed
+
+- `--ask` prints five numbered suggestions instead of one commit title
+- the prompt no longer asks for Conventional Commit format. A suggestion is a
+  plain sentence, with no prefix, no scope, and no casing rule
+- suggestions are no longer reproducible. Sampling runs at temperature 0.8
+  with no seed, so asking again gives a different set
+
 ## [0.3.0] - 2026-08-17
 
 ### Changed
