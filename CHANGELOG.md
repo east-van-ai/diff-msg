@@ -6,6 +6,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+## [0.4.1] - 2026-08-17
+
+### Changed
+
+- suggestions now run between 60 and 120 characters, both ends enforced by
+  the schema
+
+### Fixed
+
+- suggestions no longer arrive as short labels or as kebab-case echoes of
+  the branch name
+
 ## [0.4.0] - 2026-08-17
 
 ### Added

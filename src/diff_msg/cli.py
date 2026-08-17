@@ -51,7 +51,8 @@ MODEL = "qwen2.5-coder:3b"
 TEMPERATURE = 0.8
 
 SUGGESTION_COUNT = 5
-MAX_LENGTH = 100
+MIN_LENGTH = 60
+MAX_LENGTH = 120
 
 USAGE = "Usage: diff-msg [--ask]"
 
@@ -62,7 +63,11 @@ SCHEMA = {
     "properties": {
         "suggestions": {
             "type": "array",
-            "items": {"type": "string", "maxLength": MAX_LENGTH},
+            "items": {
+                "type": "string",
+                "minLength": MIN_LENGTH,
+                "maxLength": MAX_LENGTH,
+            },
             "minItems": SUGGESTION_COUNT,
             "maxItems": SUGGESTION_COUNT,
         }
@@ -70,11 +75,13 @@ SCHEMA = {
     "required": ["suggestions"],
 }
 
-# The count and the absence of fences are the schema's job. Length is here
-# as well as in the schema: maxLength clips a long line mid-word, so the
-# model has to aim short rather than be cut short.
+# The count and the absence of fences are the schema's job. Both ends of the
+# length range appear here as well, since maxLength clips rather than
+# shortens and minLength cannot be met by clipping at all. See DESIGN.md,
+# Enforced Shape.
 RULES = f"""Rules:
-- Keep each suggestion short, well under {MAX_LENGTH} characters.
+- Write one line, between {MIN_LENGTH} and {MAX_LENGTH} characters.
+- A full sentence naming what changed, not a label or a branch name.
 - Each suggestion names the whole change, not one file within it.
 - Make them genuinely different from each other, not rewordings."""
 

@@ -5,8 +5,9 @@ commit titles, using a local LLM.
 
 ## Why
 
-Your editor already writes the small ones. Three lines changed, one
-intent, and its suggestion is fine.
+Nobody calls a sommelier for a Tuesday sandwich. Your editor already
+writes the small commits: three lines changed, one intent, and its
+suggestion is fine.
 
 Then the branch ends. Twenty files, three days, four half-related ideas,
 and now it wants a single title. That is a harder question, and it gets
@@ -38,11 +39,11 @@ Bare `diff-msg` prints the usage banner; the generation is an explicit
 example output:
 
 ```text
-1. simplify the conversion logic and clean up the comments
-2. rewrite conversion to drop the intermediate step
-3. tidy the converter and its comments
-4. collapse the conversion branches into one path
-5. clean up conversion and remove stale comments
+1. simplify the conversion logic and remove the comments that no longer apply
+2. rewrite the converter to drop the intermediate representation entirely
+3. collapse the three conversion branches into a single code path
+4. tidy the converter and bring its comments back in line with the code
+5. remove the stale conversion comments and shorten the surrounding logic
 ```
 
 ## Requirements
