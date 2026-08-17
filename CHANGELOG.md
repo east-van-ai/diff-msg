@@ -6,7 +6,31 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
-## [v0.2.0] - 2026-07-19
+## [0.3.0] - 2026-08-17
+
+### Changed
+
+- renamed the project from `diffmsg` to `diff-msg`: distribution name and
+  console script are now `diff-msg`, the importable package moved from
+  `src/diffmsg/` to `src/diff_msg/` (Python module names can't contain
+  hyphens), and all docs/tests updated to match
+- tightened the prompt rules: `style` dropped from the allowed prefixes, and
+  the model is now told to use Conventional Commit format without a scope and
+  to never wrap the title in code fences
+
+### Removed
+
+- `requirements.txt` and `requirements-dev.txt`. `pyproject.toml` is now the
+  only place dependencies are declared, with the dev tools in a `dev`
+  dependency group (`pip install -e . --group dev`)
+
+### Fixed
+
+- git failures no longer masquerade as an empty diff. No repository, or no
+  `main` branch to diff against, now exits 1 with git's own message behind the
+  `diff-msg:` prefix instead of reporting "No changes vs main." and exiting 0
+
+## [0.2.0] - 2026-07-19
 
 ### Added
 

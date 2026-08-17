@@ -2,7 +2,7 @@
 Unit tests for the prompt-building layer and the local-only constants.
 """
 
-from diffmsg.cli import MODEL, OLLAMA_URL, build_prompt
+from diff_msg.cli import MODEL, OLLAMA_URL, build_prompt
 
 # ---------- build_prompt ----------
 
@@ -23,7 +23,7 @@ def test_prompt_ends_with_commit_title_cue():
 def test_prompt_states_the_rules():
     """The prefix list and the 100-character ceiling are in the rules."""
     prompt = build_prompt("main", "some diff")
-    assert "feat fix docs refactor test chore style" in prompt
+    assert "feat fix docs refactor test chore" in prompt
     assert "100 characters" in prompt
 
 

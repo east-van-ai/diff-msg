@@ -1,75 +1,73 @@
-# diffmsg
+# diff-msg
 
-A lightweight CLI tool that generates conventional commit messages from `git diff` output using a local LLM.
+A lightweight CLI tool that generates conventional commit messages from
+`git diff` output using a local LLM.
 
-## why
+## Why
 
-You commit `wip` like a normal person.
-But squash merge deserves better.
-Pipe your branch diff into `diffmsg` and get a clean conventional commit message, ready to paste.
+You commit `wip` like a normal person, but squash merge deserves better.
+Ask `diff-msg` and get a clean conventional commit message, ready to paste.
 
-## overview
+## Overview
 
-`diffmsg` pipes your staged or branch diff into a locally running LLM via Ollama and returns a formatted commit title and message body. No internet required, no API keys.
+`diff-msg` pipes your branch diff into a locally running LLM via Ollama
+and returns one formatted commit title. No internet required, no API keys.
 
-## usage
+## Usage
 
 ```bash
-diffmsg --ask
+diff-msg --ask
 ```
 
-`diffmsg` calls `git diff main...` itself and prints one commit title.
-Bare `diffmsg` prints the usage banner; the generation is an explicit
+`diff-msg` calls `git diff main...` itself and prints one commit title.
+Bare `diff-msg` prints the usage banner; the generation is an explicit
 `--ask`.
-
-planned, not implemented yet -- piping a diff in:
-
-```bash
-git diff main.. | diffmsg
-```
 
 example output:
 
 ```text
-refactor(conversion): simplify logic and clean up comments
-
-* remove dead code from conversion logic
-* replace lengthy comment with concise bullet list
-* apply bulkification logic to trigger
+refactor: simplify conversion logic and clean up comments
 ```
 
-planned, not implemented yet -- specifying a title style:
+## Requirements
 
-```bash
-git diff main.. | diffmsg --style conventional  # default
-git diff main.. | diffmsg --style simple
-git diff main.. | diffmsg --style bracket
-```
-
-## requirements
-
-- macOS
 - [Ollama](https://ollama.com) running locally
-- Python 3.x
 
-## setup
+## Setup
 
 ```bash
-brew install ollama
 ollama pull qwen2.5-coder:3b
-pipx install .   # from a local checkout; see RELEASING.md
 ```
 
-## model
+## Install
+
+- Python 3.9 or newer
+- pipx
+
+```bash
+pipx install "git+https://github.com/east-van-ai/diff-msg.git@stable"
+```
+
+## Model
 
 default: `qwen2.5-coder:3b` (Apache 2.0)
-Smaller is better. Swap via config if needed.
 
-## privacy
+## Privacy
 
-Runs ethically local. Your code never leaves your machine.
+Runs entirely on your machine. Your code never leaves it.
 No API keys. No cloud. Nothing for your manager to worry about.
 
-## license
+## Use of AI
 
-MIT
+This project is built with Artificial Intelligence (AI), deliberately
+and in the open. Code and documentation are written in collaboration
+with remote and local AI; design decisions, code review, and final
+judgment stay human.
+
+---
+
+**East Van AI** · AI for the rest of us! · Vancouver, BC, Canada
+
+[github.com/east-van-ai](https://github.com/east-van-ai) · <east-van-ai@proton.me>
+
+Copyright (c) 2026 Go Nakamaru

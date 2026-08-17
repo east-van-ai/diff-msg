@@ -1,31 +1,51 @@
-# diffmsg DESIGN
+# diff-msg DESIGN
 
-## Table of Contents
+## Scope
 
-- L1: [diffmsg DESIGN](#diffmsg-design)
-  - L3: [Table of Contents](#table-of-contents)
-  - L17: [Architecture](#architecture)
-  - L30: [File Tree](#file-tree)
-  - L53: [CLI Grammar](#cli-grammar)
-  - L84: [Determinism](#determinism)
-  - L96: [The Pipeline](#the-pipeline)
-  - L111: [Output Shape](#output-shape)
-  - L123: [Open Questions](#open-questions)
-  - L137: [Known Bugs](#known-bugs)
-  - L144: [Use of AI](#use-of-ai)
+One person develops this, on one machine. No CI, no support matrix, no
+other users to break. That is a standing licence to take the simpler
+path: the model is a constant in the source rather than a configuration
+surface, the install path assumes a current pip, releases are internal,
+and this file doubles as the bug tracker.
 
 ## Architecture
 
-`diffmsg` requires Python 3.9 or newer and has one runtime dependency,
+`diff-msg` requires Python 3.9 or newer and has one runtime dependency,
 `requests`, for talking to the local Ollama HTTP API. Everything runs
-against `localhost:11434` -- no cloud calls, no API keys, and no code
+against `localhost:11434`. No cloud calls, no API keys, and no code
 leaves the machine.
 
-The whole implementation is one module, `src/diffmsg/cli.py`: pure
+The whole implementation is one module, `src/diff_msg/cli.py`: pure
 functions with one job each, plus a `main()` that wires them into a
 pipeline. Data is plain strings; the only state read is the git
 repository in the current directory, and the only external service is
 the local model.
+
+The module carries no shebang. It is reached through the console script
+or `python -m diff_msg.cli`, never by executing the file directly.
+
+## Dependencies
+
+`pyproject.toml` is the single source of truth. Runtime needs live in
+`[project.dependencies]`. The tools for working on the code, `black`,
+`pytest`, `pytest-cov`, and `ruff`, form a PEP 735 dependency group named
+`dev`.
+
+A group rather than an optional extra, because those tools are not a
+feature of the package. An extra would publish them in the package
+metadata, where a stranger could install them alongside the tool itself.
+
+```bash
+pip install -e . --group dev
+```
+
+`--group` landed in pip 25.1, so the dev install needs a pip at least
+that new.
+
+Ruff lints and black formats. Ruff has a formatter too, and the two
+disagree, so only `ruff check` runs here. Ruff gets no configuration in
+this project, because the pinned version is the rule set. That is what
+the exact pin buys.
 
 ## File Tree
 
@@ -34,7 +54,7 @@ Trimmed view of the layout
 ```text
 .
 ├── src/
-│   └── diffmsg/
+│   └── diff_msg/
 │       ├── __init__.py
 │       └── cli.py
 ├── tests/
@@ -42,28 +62,26 @@ Trimmed view of the layout
 │   ├── test_cli_integration.py
 │   └── test_prompt.py
 ├── CHANGELOG.md
-├── CLAUDE.md
 ├── DESIGN.md
 ├── LICENSE
 ├── pyproject.toml
-├── README.md
-└── RELEASING.md
+└── README.md
 ```
 
 ## CLI Grammar
 
-`diffmsg [--ask]`.
+`diff-msg [--ask]`.
 
-Bare `diffmsg` on a TTY prints the module docstring (the usage banner)
+Bare `diff-msg` on a TTY prints the module docstring (the usage banner)
 and exits 0. Generating a commit title costs one explicit flag:
-`diffmsg --ask` -- the same posture as sibling project `docmap`, where
-the harmless invocation is the default and the action that does real
-work (here, shelling out to git and querying a model) is asked for by
-name.
+`diff-msg --ask`. That is the same posture as sibling project `docmap`,
+where the harmless invocation is the default and the action that does
+real work (here, shelling out to git and querying a model) is asked for
+by name.
 
-`diffmsg` takes no piped input yet -- reading a diff from stdin
-(`git diff main.. | diffmsg`) is a documented future feature, not
-current behavior. Bare `diffmsg` with stdin attached to a pipe is
+`diff-msg` takes no piped input yet. Reading a diff from stdin
+(`git diff main.. | diff-msg`) is a documented future feature, not
+current behaviour. Bare `diff-msg` with stdin attached to a pipe is
 therefore a usage error (exit 1), not a help dump: printing help to
 stdout in the middle of a pipeline would silently pollute it with exit
 0, and an error is the honest signal that the piped grammar does not
@@ -71,27 +89,23 @@ exist yet.
 
 Exit codes:
 
-- `0` -- success (a title was printed, "no changes" was reported, or
-  bare-on-TTY printed help).
-- `1` -- every error diffmsg raises itself: usage errors and an
-  unreachable Ollama.
-- `2` -- argparse's own errors (unknown flag), argparse's convention,
-  left untouched.
+- `0`: success (a title was printed, "no changes" was reported, or
+        bare-on-TTY printed help).
+- `1`: every error diff-msg raises itself: usage errors, a git failure, and
+        an unreachable Ollama.
+- `2`: argparse's own errors (unknown flag), argparse's convention, left
+        untouched.
 
-All self-raised errors go to stderr as `diffmsg: <message>`; usage
+All self-raised errors go to stderr as `diff-msg: <message>`; usage
 errors additionally print the usage line.
 
 ## Determinism
 
 The same diff should always produce the same title. The Ollama request
 pins `temperature: 0.0` and `seed: 42`, and the model is fixed at
-`qwen2.5-coder:3b` -- small enough to run anywhere, deterministic
+`qwen2.5-coder:3b`, small enough to run anywhere and deterministic
 enough to trust in a script. There is no configuration surface yet;
 changing the model means editing one constant.
-
-An empty diff (`git diff main...` returns nothing) is the harmless
-default: `--ask` reports "No changes vs main." and exits 0 without
-ever contacting the model.
 
 ## The Pipeline
 
@@ -99,14 +113,35 @@ ever contacting the model.
 -> `get_branch` -> `get_diff` -> empty-diff early exit ->
 `build_prompt` -> `ask_ollama` -> print one title.
 
-- `get_branch` / `get_diff` shell out to git (`git branch
-  --show-current`, `git diff main...`) via `subprocess`.
-- `build_prompt` wraps the branch name and diff in a fixed prompt
-  instructing the model to output exactly one
-  conventional-commit-style title line.
-- `ask_ollama` POSTs to the local `/api/generate` endpoint. An
-  unreachable Ollama is reported as `diffmsg: cannot reach Ollama ...`
-  on stderr (exit 1), not a `requests` traceback.
+- `run_git` runs one git command via `subprocess` and hands back its
+    stdout. See Git Failures for what it does when git fails.
+- `get_branch` and `get_diff` are thin wrappers over it, for
+    `git branch --show-current` and `git diff main...`.
+- `build_prompt` wraps the branch name and diff in a fixed prompt instructing
+    the model to output exactly one conventional-commit-style title line.
+- `ask_ollama` POSTs to the local `/api/generate` endpoint. An unreachable
+    Ollama is reported as `diff-msg: cannot reach Ollama ...` on stderr
+    (exit 1), not a `requests` traceback.
+
+## Git Failures
+
+Git is shelled out to twice, and either call can fail. There is no
+repository, or no `main` branch to diff against.
+
+The return code decides, not the output. Any non-zero exit from git is a
+diff-msg error: exit 1, with the first line of git's own message passed
+through behind the `diff-msg:` prefix. Git's `fatal:` is stripped first,
+so only one prefix survives, and one line matches the rest of the output
+discipline. Reading stdout alone cannot tell a failure from an empty
+result, and a tool that claims success when it never ran is worse than
+one that stops. Git already words each case well, so restating that
+classification in Python would only let the two drift apart.
+
+Two git outcomes are not failures, and both exit 0. An empty diff means
+there is nothing to commit, so `--ask` says "No changes vs main." without
+ever contacting the model. A detached HEAD has no branch name to print,
+so the branch name is simply empty and the diff carries the signal on its
+own.
 
 ## Output Shape
 
@@ -116,28 +151,33 @@ Exactly one commit title line on stdout:
 refactor: simplify conversion logic and clean up comments
 ```
 
-Prefix from `feat fix docs refactor test chore style`, lowercase after
+Prefix from `feat fix docs refactor test chore`, lowercase after
 the colon, 100 characters maximum, no body. The prompt enforces this;
 nothing post-processes the model output yet (see Open Questions).
 
 ## Open Questions
 
-- `--style` flag (`conventional` / `simple` / `bracket`) -- README
-  advertises it; not built.
-- Piped input (`git diff main.. | diffmsg`) -- README advertises it;
-  the grammar above reserves the pipe as an error until it exists.
+- `--style` flag (`conventional` / `simple` / `bracket`)
+- Piped input (`git diff main.. | diff-msg`)
+
+```bash
+git diff main.. | diff-msg --style conventional
+git diff main.. | diff-msg --style simple
+git diff main.. | diff-msg --style bracket
+```
+
 - Configurable model and base branch (`main` is hardcoded in
   `git diff main...`).
-- git failures (not a repo, no `main` branch) currently look like an
-  empty diff and exit 0 as "no changes" -- honest error reporting
-  would need to check the subprocess return code.
-- Model output is trusted verbatim -- no validation that the reply is
+- Model output is trusted verbatim, with no validation that the reply is
   actually one line, one prefix, under 100 chars.
+- `-t` / `-m` / `-tm` flags for title, body, or both
+- `-v` verbose mode showing the full prompt
+- A giant diff goes into the prompt whole. Nothing truncates it, so a
+  large branch can overrun the model's context.
 
 ## Known Bugs
 
-Confirmed defects, recorded here until fixed (this file is the bug
-tracker -- a solo project doesn't need GitHub Issues).
+Confirmed defects, recorded here until fixed.
 
 None currently open.
 

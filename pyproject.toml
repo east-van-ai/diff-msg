@@ -1,0 +1,48 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "diff-msg"
+version = "0.3.0"
+description = "Generate a conventional commit title from your branch diff using a local Ollama model."
+readme = "README.md"
+requires-python = ">=3.9"
+license = { text = "MIT" }
+authors = [{ name = "Go Nakamaru" }]
+keywords = ["cli", "git", "commit-message", "ollama", "llm"]
+classifiers = [
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Topic :: Software Development :: Version Control :: Git",
+]
+dependencies = ["requests"]
+
+# Local tooling, never shipped. A dependency group stays out of the wheel and
+# off PyPI, which an optional-dependencies extra would not. Install with
+# `pip install -e . --group dev` (needs pip 25.1+). The ruff and black pins are
+# exact on purpose: the pin is what freezes ruff's default rule set.
+[dependency-groups]
+dev = [
+    "black==25.11.0",
+    "pytest",
+    "pytest-cov",
+    "ruff==0.16.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/east-van-ai/diff-msg"
+
+[project.scripts]
+diff-msg = "diff_msg.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools]
+package-dir = { "" = "src" }
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
