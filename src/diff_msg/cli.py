@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """
 # ==============================================
 # East Van AI -- AI for the rest of us!
@@ -6,9 +5,7 @@
 # contact: east-van-ai@proton.me
 # ==============================================
 #
-# ~~~ ~~~ ~~~ ~~~ diffmsg ~~~ ~~~ ~~~ ~~~
-#
-# cli.py -- entry point for diffmsg.
+# ~~~ ~~~ ~~~ ~~~ ~~~ diff-msg ~~~ ~~~ ~~~ ~~~ ~~~
 #
 # Generate one conventional commit title for the current branch by feeding
 # `git diff main...` to a locally running Ollama model. No cloud calls, no
@@ -16,18 +13,20 @@
 # leaves the machine.
 #
 # Usage:
-#    diffmsg [--ask]
+#    diff-msg [--ask]
 #
-#    --ask    read the branch name and `git diff main...`, ask the local
-#             model, print one commit title. Bare `diffmsg` prints this
-#             help; generating a title is an explicit `diffmsg --ask`
+#    --ask    Read the branch name and `git diff main...`, ask the local
+#             model, print one commit title. Bare `diff-msg` prints this
+#             help; generating a title is an explicit `diff-msg --ask`
 #
 # Requires: Ollama running locally with qwen2.5-coder:3b pulled
 # (`ollama pull qwen2.5-coder:3b`).
 #
-# Exit codes: 0 success (title printed, or nothing to commit, or
-# bare-on-TTY printed help); 1 any diffmsg-raised error (usage,
-# unreachable Ollama); 2 argparse's own errors.
+# Exit codes:
+#    0: success (title printed, or nothing to commit, or bare-on-TTY
+#        printed help)
+#    1: any diff-msg-raised error (usage, git failure, unreachable Ollama)
+#    2: argparse's own errors
 #
 # License: MIT
 # ==============================================
@@ -42,28 +41,41 @@ import requests
 OLLAMA_URL = "http://localhost:11434/api/generate"
 MODEL = "qwen2.5-coder:3b"
 
-USAGE = "Usage: diffmsg [--ask]"
+USAGE = "Usage: diff-msg [--ask]"
+
+
+def run_git(args):
+    """Run a git command and return its stdout, or exit 1 if git failed.
+
+    The return code decides, not the output: stdout alone cannot tell a
+    failure from an empty result. The first line of git's own message is
+    passed through, with its `fatal: ` stripped so only one prefix survives.
+    """
+    result = subprocess.run(["git", *args], capture_output=True, text=True, check=False)
+    if result.returncode != 0:
+        stderr = result.stderr.strip()
+        first_line = stderr.splitlines()[0] if stderr else ""
+        message = first_line.removeprefix("fatal: ") or f"git {args[0]} failed"
+        print(f"diff-msg: {message}", file=sys.stderr)
+        sys.exit(1)
+    return result.stdout.strip()
 
 
 def get_branch():
-    """Return the current git branch name."""
-    result = subprocess.run(
-        ["git", "branch", "--show-current"], capture_output=True, text=True
-    )
-    return result.stdout.strip()
+    """Return the current git branch name, empty on a detached HEAD."""
+    return run_git(["branch", "--show-current"])
 
 
 def get_diff():
     """Return the diff of the current branch against main."""
-    result = subprocess.run(["git", "diff", "main..."], capture_output=True, text=True)
-    return result.stdout.strip()
+    return run_git(["diff", "main..."])
 
 
 def ask_ollama(prompt):
     """Send the prompt to the local Ollama model and return its reply.
 
     The request pins temperature 0.0 and seed 42 so the same diff always
-    produces the same title. An unreachable Ollama is a diffmsg error
+    produces the same title. An unreachable Ollama is a diff-msg error
     (exit 1), not a requests traceback.
     """
     try:
@@ -77,7 +89,7 @@ def ask_ollama(prompt):
             },
         )
     except requests.RequestException as e:
-        print(f"diffmsg: cannot reach Ollama at {OLLAMA_URL}: {e}", file=sys.stderr)
+        print(f"diff-msg: cannot reach Ollama at {OLLAMA_URL}: {e}", file=sys.stderr)
         sys.exit(1)
     return response.json()["response"].strip()
 
@@ -91,11 +103,15 @@ Git diff    :
 {diff}
 
 Rules:
-- Pick ONE prefix from: feat fix docs refactor test chore style
+- Pick ONE prefix from: feat fix docs refactor test chore
 - Write ONE commit title only. No body. No explanation.
 - Max 100 characters including the prefix.
+- Use Conventional Commit format without scope in parentheses
 - Format: prefix: short description
+- No code fences
+- No code blocks
 - Use lowercase after the colon.
+- Do not wrap the output in triple backticks (```), under any circumstance.
 
 Commit title:"""
 
@@ -103,7 +119,7 @@ Commit title:"""
 def main():
     """Parse arguments, enforce the CLI grammar, and run the pipeline."""
     parser = argparse.ArgumentParser(
-        prog="diffmsg",
+        prog="diff-msg",
         description="Generate a conventional commit title from your branch diff.",
     )
     parser.add_argument(
@@ -115,14 +131,14 @@ def main():
 
     if len(sys.argv) == 1:
 
-        # a human typed bare `diffmsg`
+        # a human typed bare `diff-msg`
         if sys.stdin.isatty():
             print(__doc__, file=sys.stdout)
             sys.exit(0)
 
         # piped input, real usage error -- stdin piping is not built yet
         print(
-            "diffmsg: missing --ask; diffmsg takes no piped input yet.",
+            "diff-msg: missing --ask; diff-msg takes no piped input yet.",
             file=sys.stderr,
         )
         print(USAGE, file=sys.stderr)
