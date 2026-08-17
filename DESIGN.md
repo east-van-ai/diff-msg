@@ -159,7 +159,7 @@ configuration surface yet; changing the model means editing one constant.
 ## Enforced Shape
 
 The request carries a JSON schema, so the reply is an object holding an
-array of exactly five strings, each capped at 100 characters. Ollama
+array of exactly five strings, each between 60 and 120 characters. Ollama
 constrains generation to fit it.
 
 That moves the output contract out of the prompt and into the request. A
@@ -173,10 +173,20 @@ The numbering is done in Python, not asked for. A model that cannot be
 relied on to count to five is not the right thing to ask for `1.` through
 `5.`.
 
-The length cap is the one part of the contract that needs saying twice. A
-`maxLength` clips a long line mid-word, so the model has to be asked for
-brevity as well as held to it. The schema is the backstop, not the
-instruction.
+Length is pinned at both ends, 60 characters to 120, and both ends are
+stated in the prompt as well as in the schema. A `maxLength` clips a long
+line mid-word rather than shortening it, and a `minLength` cannot be
+satisfied by clipping at all, so neither survives as a schema entry alone.
+The schema is the backstop, not the instruction.
+
+The floor exists because asking for brevity worked far too well. Told to
+keep each suggestion "short, well under" the cap, the model answered at
+half the budget, and sometimes collapsed into kebab-case slugs echoing the
+branch name, `ls-sql-modularization` in place of a sentence. Inviting it to
+use the room helped a little, and unreliably. A `minLength` ended the
+argument, since nothing shorter can be generated. The squash merge this
+tool is for describes a long branch, and a long branch rarely fits in five
+words.
 
 The prompt also carries the rules that shape *content* rather than form:
 genuinely different suggestions, each naming the whole change rather than
@@ -208,15 +218,15 @@ own.
 Five numbered suggestions on stdout, and nothing else:
 
 ```text
-1. simplify the conversion logic and clean up the comments
-2. rewrite conversion to drop the intermediate step
-3. tidy the converter and its comments
-4. collapse the conversion branches into one path
-5. clean up conversion and remove stale comments
+1. simplify the conversion logic and remove the comments that no longer apply
+2. rewrite the converter to drop the intermediate representation entirely
+3. collapse the three conversion branches into a single code path
+4. tidy the converter and bring its comments back in line with the code
+5. remove the stale conversion comments and shorten the surrounding logic
 ```
 
-One line each, 100 characters maximum, both guaranteed by the schema. See
-Enforced Shape. No prefix, no scope, and no particular casing, since a
+One line each, between 60 and 120 characters, all guaranteed by the schema.
+See Enforced Shape. No prefix, no scope, and no particular casing, since a
 suggestion is a plain sentence.
 
 A body is not part of this shape. The whole reply is titles.

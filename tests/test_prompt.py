@@ -12,6 +12,7 @@ import json
 from diff_msg import cli
 from diff_msg.cli import (
     MAX_LENGTH,
+    MIN_LENGTH,
     MODEL,
     OLLAMA_URL,
     SCHEMA,
@@ -43,20 +44,28 @@ def test_prompt_carries_the_content_rules():
     assert "code fence" not in prompt
 
 
-def test_prompt_states_the_length_limit():
-    """The cap is asked for, not only enforced: maxLength clips mid-word."""
-    assert str(MAX_LENGTH) in build_prompt("main", "some diff")
+def test_prompt_states_the_length_range():
+    """Both ends are asked for, not only enforced. See DESIGN.md."""
+    prompt = build_prompt("main", "some diff")
+    assert str(MIN_LENGTH) in prompt
+    assert str(MAX_LENGTH) in prompt
 
 
 # ---------- the schema ----------
 
 
 def test_schema_pins_the_count_and_the_length():
-    """Exactly five items, each capped, enforced by the request."""
+    """Exactly five items, each inside the range, enforced by the request."""
     items = SCHEMA["properties"]["suggestions"]
     assert items["minItems"] == SUGGESTION_COUNT
     assert items["maxItems"] == SUGGESTION_COUNT
+    assert items["items"]["minLength"] == MIN_LENGTH
     assert items["items"]["maxLength"] == MAX_LENGTH
+
+
+def test_the_floor_is_below_the_ceiling():
+    """A floor above the cap would make every reply impossible."""
+    assert MIN_LENGTH < MAX_LENGTH
 
 
 # ---------- format_suggestions ----------
