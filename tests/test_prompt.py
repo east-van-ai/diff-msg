@@ -9,8 +9,8 @@ Enforced Shape.
 
 import json
 
-from diff_msg import cli
-from diff_msg.cli import (
+from diff_msg import cli_ask
+from diff_msg.cli_ask import (
     MAX_LENGTH,
     MIN_LENGTH,
     MODEL,
@@ -104,8 +104,8 @@ def test_request_sends_the_schema_and_no_seed(monkeypatch):
         sent.update(json)
         return _FakeResponse('{"suggestions": ["one"]}')
 
-    monkeypatch.setattr(cli.requests, "post", fake_post)
-    cli.ask_ollama("a prompt")
+    monkeypatch.setattr(cli_ask.requests, "post", fake_post)
+    cli_ask.ask_ollama("a prompt")
 
     assert sent["format"] == SCHEMA
     assert sent["options"]["temperature"] > 0
@@ -115,10 +115,10 @@ def test_request_sends_the_schema_and_no_seed(monkeypatch):
 def test_unusable_reply_is_a_diff_msg_error(monkeypatch, capsys):
     """A reply that escapes the schema exits 1, not with a traceback."""
     monkeypatch.setattr(
-        cli.requests, "post", lambda url, json: _FakeResponse("not json at all")
+        cli_ask.requests, "post", lambda url, json: _FakeResponse("not json at all")
     )
     try:
-        cli.ask_ollama("a prompt")
+        cli_ask.ask_ollama("a prompt")
     except SystemExit as exit_info:
         assert exit_info.code == 1
     else:
@@ -129,8 +129,10 @@ def test_unusable_reply_is_a_diff_msg_error(monkeypatch, capsys):
 def test_reply_is_parsed_into_a_list(monkeypatch):
     """The suggestions array comes back as a plain list of strings."""
     payload = json.dumps({"suggestions": ["one", "two"]})
-    monkeypatch.setattr(cli.requests, "post", lambda url, json: _FakeResponse(payload))
-    assert cli.ask_ollama("a prompt") == ["one", "two"]
+    monkeypatch.setattr(
+        cli_ask.requests, "post", lambda url, json: _FakeResponse(payload)
+    )
+    assert cli_ask.ask_ollama("a prompt") == ["one", "two"]
 
 
 # ---------- constants ----------

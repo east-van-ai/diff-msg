@@ -6,6 +6,23 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-09-02
+
+### Added
+
+- `diff-msg ask PATH` reads the checkout at PATH, so any repository can be
+  asked about, not only the current directory
+- `version` and `--version` print the installed version
+
+### Changed
+
+- an unattended run under cron or `nohup` prints the banner instead of
+  failing; only a genuine pipe is now a usage error
+
+### Removed
+
+- `--ask`, replaced by the `ask` command word
+
 ## [0.4.1] - 2026-08-17
 
 ### Changed
