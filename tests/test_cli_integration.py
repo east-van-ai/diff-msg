@@ -1,71 +1,57 @@
 """
-CLI grammar tests. None of these require a running Ollama.
+Behaviour behind the grammar: what `ask` does once the command line has
+been read. None of these require a running Ollama. The grammar itself is
+pinned in test_grammar.py.
 """
 
 import subprocess
 
-import pytest
+from diff_msg import args, cli_ask
 
-from diff_msg import cli
-
-# ---------- bare invocation ----------
+# ---------- ask, without a model ----------
 
 
-def test_bare_on_tty_prints_banner(monkeypatch, capsys):
-    """Bare `diff-msg` on a TTY prints the usage banner and exits 0."""
-    monkeypatch.setattr("sys.argv", ["diff-msg"])
-    monkeypatch.setattr("sys.stdin.isatty", lambda: True)
-    with pytest.raises(SystemExit) as excinfo:
-        cli.main()
-    assert excinfo.value.code == 0
-    out = capsys.readouterr().out
-    assert "diff-msg" in out
-    assert "--ask" in out
-
-
-def test_bare_with_piped_stdin_is_usage_error(run_cli):
-    """Bare `diff-msg` with piped stdin errors to stderr with exit 1."""
-    result = run_cli([], input_text="")
-    assert result.returncode == 1
-    assert "diff-msg:" in result.stderr
-    assert "Usage: diff-msg" in result.stderr
-    assert result.stdout == ""
-
-
-# ---------- argparse convention ----------
-
-
-def test_unknown_flag_is_argparse_error(run_cli):
-    """An unknown flag is argparse's own error: exit 2."""
-    result = run_cli(["--nope"])
-    assert result.returncode == 2
-
-
-# ---------- --ask without a model ----------
-
-
-def test_ask_with_no_diff_exits_clean(monkeypatch, capsys):
-    """`--ask` with an empty diff reports no changes and exits 0."""
-    monkeypatch.setattr("sys.argv", ["diff-msg", "--ask"])
-    monkeypatch.setattr(cli, "get_branch", lambda: "feat/x")
-    monkeypatch.setattr(cli, "get_diff", lambda: "")
-    with pytest.raises(SystemExit) as excinfo:
-        cli.main()
-    assert excinfo.value.code == 0
+def test_ask_with_no_diff_exits_clean(call_main, capsys, monkeypatch, tmp_path):
+    """An empty diff reports no changes and never contacts the model."""
+    monkeypatch.setattr(cli_ask, "get_branch", lambda _cwd: "feat/x")
+    monkeypatch.setattr(cli_ask, "get_diff", lambda _cwd: "")
+    assert call_main(["ask", str(tmp_path)]) == 0
     assert "No changes vs main." in capsys.readouterr().out
+
+
+def test_ask_reads_the_repository_it_was_pointed_at(call_main, monkeypatch, tmp_path):
+    """PATH reaches git as its working directory, not the process's own."""
+    seen = []
+    monkeypatch.setattr(cli_ask, "get_branch", lambda cwd: seen.append(cwd) or "main")
+    monkeypatch.setattr(cli_ask, "get_diff", lambda cwd: seen.append(cwd) or "")
+    call_main(["ask", str(tmp_path)])
+    assert seen == [str(tmp_path), str(tmp_path)]
+
+
+# ---------- version ----------
+
+
+def test_version_falls_back_when_not_installed(monkeypatch):
+    """An uninstalled distribution reports a placeholder rather than raising."""
+
+    def _missing(_name):
+        raise args.metadata.PackageNotFoundError
+
+    monkeypatch.setattr(args.metadata, "version", _missing)
+    assert args.installed_version() == "unknown (not installed)"
 
 
 # ---------- git failures ----------
 
 
-def _git(args, cwd):
+def _git(argv, cwd):
     """Run a git command in cwd, failing the test if git itself fails."""
-    subprocess.run(["git", *args], cwd=cwd, check=True, capture_output=True)
+    subprocess.run(["git", *argv], cwd=cwd, check=True, capture_output=True)
 
 
 def test_ask_outside_a_repository_errors(run_cli, tmp_path):
-    """`--ask` outside a repository exits 1 with a single `diff-msg:` prefix."""
-    result = run_cli(["--ask"], cwd=tmp_path)
+    """A directory that is not a checkout exits 1 with one `diff-msg:` prefix."""
+    result = run_cli(["ask", str(tmp_path)])
     assert result.returncode == 1
     assert result.stderr.startswith("diff-msg: ")
     assert "fatal:" not in result.stderr
@@ -74,9 +60,9 @@ def test_ask_outside_a_repository_errors(run_cli, tmp_path):
 
 
 def test_ask_without_a_main_branch_errors(run_cli, tmp_path):
-    """`--ask` in a repo with no `main` branch exits 1 in git's own words."""
+    """A repo with no `main` branch exits 1 in git's own words."""
     _git(["init", "-q", "-b", "trunk"], cwd=tmp_path)
-    result = run_cli(["--ask"], cwd=tmp_path)
+    result = run_cli(["ask", str(tmp_path)])
     assert result.returncode == 1
     assert result.stderr.startswith("diff-msg: ")
     assert "fatal:" not in result.stderr
@@ -93,6 +79,6 @@ def test_ask_on_a_detached_head_is_not_a_failure(run_cli, tmp_path):
         cwd=tmp_path,
     )
     _git(["switch", "-q", "--detach", "HEAD"], cwd=tmp_path)
-    result = run_cli(["--ask"], cwd=tmp_path)
+    result = run_cli(["ask", "."], cwd=tmp_path)
     assert result.returncode == 0
     assert "No changes vs main." in result.stdout

@@ -22,19 +22,20 @@ more turn up.
 
 ## Overview
 
-`diff-msg` pipes your branch diff into a locally running LLM via Ollama
+`diff-msg` feeds your branch diff to a locally running LLM via Ollama
 and returns five one-line suggestions. Nothing is pinned, so every ask
 gives you a fresh set. No internet required, no API keys.
 
 ## Usage
 
 ```bash
-diff-msg --ask
+diff-msg ask .
 ```
 
-`diff-msg` calls `git diff main...` itself and prints five suggestions.
-Bare `diff-msg` prints the usage banner; the generation is an explicit
-`--ask`.
+`diff-msg` calls `git diff main...` and prints five suggestions.
+`ask` takes the checkout to read, and `.` is the one you are standing in.
+Any other checkout works the same way. Bare `diff-msg` prints the usage
+banner, and `diff-msg ask` explains the command.
 
 example output:
 

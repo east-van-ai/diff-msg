@@ -29,8 +29,13 @@ output is raw material and shaping it into a commit is the reader's job.
 One person develops this, on one machine. No CI, no support matrix, no
 other users to break. That is a standing licence to take the simpler
 path: the model is a constant in the source rather than a configuration
-surface, the install path assumes a current pip, releases are internal,
-and this file doubles as the bug tracker.
+surface, the install path assumes a current pip, and releases are
+internal.
+
+One limit is worth stating here rather than leaving a reader to find it.
+A diff that is mostly prose is outside what this can do. The model
+follows the text it finds inside the diff instead of describing it, and
+no prompt wording fixes that at the size of model this runs on.
 
 ## Architecture
 
@@ -39,14 +44,19 @@ and this file doubles as the bug tracker.
 against `localhost:11434`. No cloud calls, no API keys, and no code
 leaves the machine.
 
-The whole implementation is one module, `src/diff_msg/cli.py`: pure
-functions with one job each, plus a `main()` that wires them into a
-pipeline. Data is plain strings; the only state read is the git
-repository in the current directory, and the only external service is
-the local model.
+The implementation is three modules under `src/diff_msg/`. `args.py`
+holds the command line's vocabulary, `cli_ask.py` holds the `ask` command
+and the pipeline it runs, and `cli.py` is the entry point that reads the
+command line and hands off. Pure functions with one job each, and data
+that is plain strings. The only state read is the git repository `ask`
+was pointed at, and the only external service is the local model.
 
-The module carries no shebang. It is reached through the console script
-or `python -m diff_msg.cli`, never by executing the file directly.
+The split keeps the entry point small. An entry point that also holds a
+command's work grows without bound, and the command line is the part that
+has to stay readable.
+
+No module carries a shebang. They are reached through the console script
+or `python -m diff_msg.cli`, never by executing a file directly.
 
 ## Dependencies
 
@@ -71,57 +81,66 @@ disagree, so only `ruff check` runs here. Ruff gets no configuration in
 this project, because the pinned version is the rule set. That is what
 the exact pin buys.
 
-## File Tree
-
-Trimmed view of the layout
-
-```text
-.
-├── src/
-│   └── diff_msg/
-│       ├── __init__.py
-│       └── cli.py
-├── tests/
-│   ├── conftest.py
-│   ├── test_cli_integration.py
-│   └── test_prompt.py
-├── CHANGELOG.md
-├── DESIGN.md
-├── LICENSE
-├── pyproject.toml
-└── README.md
-```
-
 ## CLI Grammar
 
-`diff-msg [--ask]`.
+`diff-msg ask PATH`.
 
-Bare `diff-msg` on a TTY prints the module docstring (the usage banner)
-and exits 0. Generating a commit title costs one explicit flag:
-`diff-msg --ask`. That is the same posture as sibling project `docmap`,
-where the harmless invocation is the default and the action that does
-real work (here, shelling out to git and querying a model) is asked for
-by name.
+The command word sits at `argv[1]` and its argument at `argv[2]`, and both
+are read off those slots directly. Since Python 3.12 argparse back-fills a
+trailing positional from a token appearing after any number of flags.
+That makes `diff-msg ask --flag PATH` parse happily, and the accepted
+grammar drifts away from the documented one. Reading the slots decides the shape instead
+of inferring it. A second bare word after PATH is a stray, named by
+diff-msg itself at exit 1 rather than left to argparse.
 
-`diff-msg` takes no piped input yet. Reading a diff from stdin
-(`git diff main.. | diff-msg`) is a documented future feature, not
-current behaviour. Bare `diff-msg` with stdin attached to a pipe is
-therefore a usage error (exit 1), not a help dump: printing help to
-stdout in the middle of a pipeline would silently pollute it with exit
-0, and an error is the honest signal that the piped grammar does not
-exist yet.
+A bare word is a question, and documentation is the answer. Bare
+`diff-msg` prints the module docstring and exits 0. Bare `diff-msg ask`
+prints the ask documentation and exits 0. The token count alone decides
+that. Once any other token is present the user asked for something
+specific, and answering with help would hide the mistake, so a missing
+PATH there is an error at exit 1.
+
+Doing the work costs a command word. A bare invocation is harmless, and
+shelling out to git and querying a model is asked for by name.
+
+`ask` takes the directory to work in, and `diff-msg ask .` is the current
+one. Git's answer depends on which repository it is standing in, so that
+choice is stated on the command line rather than left ambient. A PATH that
+is not a directory is a readiness failure: exit 1, and no usage line,
+because the grammar was fine and what the run needed was not there. A
+directory that is not a checkout is git's own message passed through. See
+Git Failures.
+
+### No piped input
+
+`diff-msg` reads nothing from stdin. Its input is git, in the directory it
+was pointed at, and there is no second source. `ask PATH` already covers
+working on a checkout you are not standing in, which is the reach a piped
+diff would have bought.
+
+Any run with piped stdin is therefore a usage error, exit 1, whatever the
+command word. A diff sent down a pipe was sent to be read. Printing help
+at exit 0 instead would drop it in silence and report success.
+
+Piped is decided by stdin's file type, never by `isatty()`. A pipe, a
+redirect, and a socket carry content. A character device does not, and
+that is where `isatty()` goes wrong: it is false for `/dev/null` too,
+which cron, systemd, `nohup`, and CI hand a process. Deciding on
+`isatty()` alone would make one command line answer two ways depending on
+how it was launched, and a test for it would then pass or fail with the
+launch context rather than with the code.
 
 Exit codes:
 
-- `0`: success (a title was printed, "no changes" was reported, or
-        bare-on-TTY printed help).
-- `1`: every error diff-msg raises itself: usage errors, a git failure, and
-        an unreachable Ollama.
-- `2`: argparse's own errors (unknown flag), argparse's convention, left
-        untouched.
+- `0`: success. Suggestions printed, "no changes" reported, or documentation
+        printed.
+- `1`: every error diff-msg raises itself: usage errors, a PATH that is
+        not a directory, a git failure, and an unreachable Ollama.
+- `2`: argparse's own errors (unknown command, unknown flag), argparse's
+        convention, left untouched.
 
-All self-raised errors go to stderr as `diff-msg: <message>`; usage
-errors additionally print the usage line.
+All self-raised errors go to stderr as `diff-msg: <message>`. Usage errors
+additionally print the usage line. Readiness failures do not.
 
 ## Sampling
 
@@ -141,19 +160,21 @@ configuration surface yet; changing the model means editing one constant.
 
 ## The Pipeline
 
-`main()` runs: parse args -> grammar guards (bare invocation, stdin)
--> `get_branch` -> `get_diff` -> empty-diff early exit ->
+`main()` runs: read the command slots -> grammar guards (bare word,
+stdin, PATH) -> `get_branch` -> `get_diff` -> empty-diff early exit ->
 `build_prompt` -> `ask_ollama` -> `format_suggestions` -> print.
 
-- `run_git` runs one git command via `subprocess` and hands back its
-    stdout. See Git Failures for what it does when git fails.
+- `run_git` runs one git command via `subprocess` and hands back its stdout.
+  See Git Failures for what it does when git fails.
 - `get_branch` and `get_diff` are thin wrappers over it, for
-    `git branch --show-current` and `git diff main...`.
+  `git branch --show-current` and `git diff main...`. Both run in the directory
+  `ask` was given, handed to `subprocess` as its working directory.
 - `build_prompt` wraps the branch name and diff in a fixed prompt asking the
-    model for five one-line suggestions.
-- `ask_ollama` POSTs to the local `/api/generate` endpoint and returns the
-    five strings. An unreachable Ollama is reported as `diff-msg: cannot
-    reach Ollama ...` on stderr (exit 1), not a `requests` traceback.
+  model for five one-line suggestions.
+- `ask_ollama` POSTs to the local `/api/generate` endpoint and returns the five
+  strings. An unreachable Ollama is reported as
+  `diff-msg: cannot reach Ollama ...` on stderr (exit 1), not a `requests`
+  traceback.
 - `format_suggestions` numbers the list for printing.
 
 ## Enforced Shape
@@ -208,7 +229,7 @@ one that stops. Git already words each case well, so restating that
 classification in Python would only let the two drift apart.
 
 Two git outcomes are not failures, and both exit 0. An empty diff means
-there is nothing to commit, so `--ask` says "No changes vs main." without
+there is nothing to commit, so `ask` says "No changes vs main." without
 ever contacting the model. A detached HEAD has no branch name to print,
 so the branch name is simply empty and the diff carries the signal on its
 own.
@@ -230,55 +251,6 @@ See Enforced Shape. No prefix, no scope, and no particular casing, since a
 suggestion is a plain sentence.
 
 A body is not part of this shape. The whole reply is titles.
-
-## Open Questions
-
-- `--style` flag (`conventional` / `simple` / `bracket`)
-- Piped input (`git diff main.. | diff-msg`)
-
-```bash
-git diff main.. | diff-msg --style conventional
-git diff main.. | diff-msg --style simple
-git diff main.. | diff-msg --style bracket
-```
-
-- Configurable model and base branch (`main` is hardcoded in
-  `git diff main...`).
-- A body suggestion, and the `-t` / `-m` / `-tm` flags for title, body, or
-  both. Titles only for now.
-- `-v` verbose mode showing the full prompt
-- A giant diff goes into the prompt whole. Nothing truncates it, so a
-  large branch can overrun the model's context.
-- Choosing the input by the kind of change. Full diff content suits code,
-  where the meaning is in the lines. File-level input (`git diff --numstat`,
-  paths and line counts only) suits prose, where the meaning is in which
-  files moved and by how much, and it carries no text for the model to
-  mistake for instructions. Deciding automatically, by file extension or by
-  diff size, is undesigned.
-
-## Known Bugs
-
-Confirmed defects, recorded here until fixed.
-
-### A prose-heavy diff hijacks the model
-
-A diff whose content reads as instructions gets followed instead of
-described. The model stops naming the change and starts answering the text
-it found inside it.
-
-Reproduced on a documentation branch whose diff edits a rules file: the
-five suggestions came back as advice about em-dashes, because the diff
-contained rules about em-dashes. Filenames get corrupted in the process,
-`CLAUDE.md` arriving as `CLAIDE.md` and `CLAUS.md`, which is the dangerous
-part. A wrong filename in a commit title looks right at a glance.
-
-Delimiting the diff and instructing the model to treat it as data does not
-fix it at 3b. It helps at 8b, which suggests the boundary is a capability
-the small model lacks rather than a prompt that needs rewording.
-
-This tool cannot describe its own repository, or any repository whose
-diffs are mostly prose. File-level input sidesteps it entirely, since a
-list of paths carries nothing to obey. See Open Questions.
 
 ## Use of AI
 
