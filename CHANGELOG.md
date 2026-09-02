@@ -6,6 +6,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+## [0.5.1] - 2026-09-02
+
+### Changed
+
+- the default model is now Cohere's `tiny-aya-global` (CC-BY-NC 4.0), in
+  place of `qwen2.5-coder:3b`
+- the prompt asks for the imperative mood, so suggestions read as commit
+  titles rather than as descriptions of them
+
 ## [0.5.0] - 2026-09-02
 
 ### Added

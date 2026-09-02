@@ -24,8 +24,8 @@
 #
 # diff-msg reads no piped input. PATH says which repository to read.
 #
-# Requires: Ollama running locally with qwen2.5-coder:3b pulled
-# (`ollama pull qwen2.5-coder:3b`).
+# Requires: Ollama running locally with tiny-aya-global pulled
+# (`ollama pull hf.co/CohereLabs/tiny-aya-global-GGUF:Q4_K_M`).
 #
 # Exit codes:
 #    0: success (suggestions printed, nothing to commit, or documentation

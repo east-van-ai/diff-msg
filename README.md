@@ -40,11 +40,11 @@ banner, and `diff-msg ask` explains the command.
 example output:
 
 ```text
-1. simplify the conversion logic and remove the comments that no longer apply
-2. rewrite the converter to drop the intermediate representation entirely
-3. collapse the three conversion branches into a single code path
-4. tidy the converter and bring its comments back in line with the code
-5. remove the stale conversion comments and shorten the surrounding logic
+1. Simplify the conversion logic and remove the comments that no longer apply
+2. Rewrite the converter to drop the intermediate representation entirely
+3. Collapse the three conversion branches into a single code path
+4. Tidy the converter and bring its comments back in line with the code
+5. Remove the stale conversion comments and shorten the surrounding logic
 ```
 
 ## Requirements
@@ -54,7 +54,7 @@ example output:
 ## Setup
 
 ```bash
-ollama pull qwen2.5-coder:3b
+ollama pull hf.co/CohereLabs/tiny-aya-global-GGUF:Q4_K_M
 ```
 
 ## Install
@@ -68,7 +68,11 @@ pipx install "git+https://github.com/east-van-ai/diff-msg.git"
 
 ## Model
 
-default: `qwen2.5-coder:3b` (Apache 2.0)
+default: `tiny-aya-global` (CC-BY-NC 4.0)
+
+Cohere's small multilingual model, Canadian like the rest of this. The
+licence is non-commercial. Use it, read it, take it apart. Don't sell it,
+and don't build a product on top of it.
 
 ## Privacy
 
