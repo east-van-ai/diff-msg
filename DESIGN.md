@@ -152,11 +152,30 @@ The request sets `temperature: 0.8` and sends no seed, so Ollama picks its
 own each time and the five titles move from run to run. The output is not
 reproducible, and for this tool that is the point.
 
-The model stays fixed at `qwen2.5-coder:3b`. A 3b model on an 8 GB machine
-answers in seconds, where an 8b model against a large diff spends its time
-swapping. Comprehension is genuinely better at 8b, and it is still the
-wrong trade when a whole diff has to fit in memory beside it. There is no
-configuration surface yet; changing the model means editing one constant.
+The model stays fixed at `tiny-aya-global`, Cohere's 3.35b, at Q4_K_M. A
+3b model on an 8 GB machine answers in seconds, where an 8b model against a
+large diff spends its time swapping. Comprehension is genuinely better at
+8b, and it is still the wrong trade when a whole diff has to fit in memory
+beside it. There is no configuration surface yet; changing the model means
+editing one constant.
+
+Several 3b models clear that bar, so the size class does not settle which
+one. Cohere is Canadian, and a tool that runs entirely on the machine in
+front of it may as well run a model from home. That is the reason.
+
+What the swap gives up and gains is worth recording next to it. The code
+model reads code better. Against that, on the branch both were asked about,
+`tiny-aya-global` carried the repository's name correctly through all five
+suggestions where the code model never named the project at all. A small
+model can return an identifier subtly misspelled, close enough to read as
+correct at a glance, and the suggestions here are read by someone who knows
+the branch. A wrong name is the one error that survives that reading. One
+branch is thin evidence, so this is an observation, not the deciding
+argument.
+
+The cost is voice. `tiny-aya-global` writes noun phrases by default,
+"Refactoring the converter" where the log wants "Refactor the converter",
+so the prompt now asks for the imperative.
 
 ## The Pipeline
 
@@ -211,8 +230,14 @@ words.
 
 The prompt also carries the rules that shape *content* rather than form:
 genuinely different suggestions, each naming the whole change rather than
-one file. Those cannot be schema-enforced, and they are the ones the model
-still gets wrong.
+one file, each in the imperative mood. Those cannot be schema-enforced, and
+they are the ones the model still gets wrong.
+
+Mood is the borderline one, since it looks like form. A `pattern` could ban
+the handful of openings a noun phrase tends to use, but only those, and a
+model steered off "Refactoring" reaches for "Changes to" rather than for a
+verb. Recognizing a verb is not something a regular expression does.
+So the imperative is asked for, and nothing enforces it.
 
 ## Git Failures
 
@@ -239,16 +264,17 @@ own.
 Five numbered suggestions on stdout, and nothing else:
 
 ```text
-1. simplify the conversion logic and remove the comments that no longer apply
-2. rewrite the converter to drop the intermediate representation entirely
-3. collapse the three conversion branches into a single code path
-4. tidy the converter and bring its comments back in line with the code
-5. remove the stale conversion comments and shorten the surrounding logic
+1. Simplify the conversion logic and remove the comments that no longer apply
+2. Rewrite the converter to drop the intermediate representation entirely
+3. Collapse the three conversion branches into a single code path
+4. Tidy the converter and bring its comments back in line with the code
+5. Remove the stale conversion comments and shorten the surrounding logic
 ```
 
 One line each, between 60 and 120 characters, all guaranteed by the schema.
-See Enforced Shape. No prefix, no scope, and no particular casing, since a
-suggestion is a plain sentence.
+See Enforced Shape. No prefix and no scope, since a suggestion is a plain
+sentence. Casing is not enforced, though the prompt's imperative examples
+tend to draw a capital.
 
 A body is not part of this shape. The whole reply is titles.
 

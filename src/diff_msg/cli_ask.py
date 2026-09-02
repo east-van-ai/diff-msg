@@ -9,8 +9,8 @@
 #
 #    PATH   The git checkout to read. `.` is the current directory.
 #
-# Requires: Ollama running locally with qwen2.5-coder:3b pulled
-# (`ollama pull qwen2.5-coder:3b`).
+# Requires: Ollama running locally with tiny-aya-global pulled
+# (`ollama pull hf.co/CohereLabs/tiny-aya-global-GGUF:Q4_K_M`).
 """
 
 import json
@@ -23,7 +23,7 @@ import requests
 from .args import EXIT_ERROR, EXIT_OK
 
 OLLAMA_URL = "http://localhost:11434/api/generate"
-MODEL = "qwen2.5-coder:3b"
+MODEL = "hf.co/CohereLabs/tiny-aya-global-GGUF:Q4_K_M"
 
 # Hot, because the point is a different set of ideas each run.
 # See DESIGN.md, Sampling.
@@ -59,6 +59,8 @@ SCHEMA = {
 RULES = f"""Rules:
 - Write one line, between {MIN_LENGTH} and {MAX_LENGTH} characters.
 - A full sentence naming what changed, not a label or a branch name.
+- Start with a verb in the imperative: "Add", "Rename", "Collapse".
+  Not "Adding", not "Addition of", not "Changes to".
 - Each suggestion names the whole change, not one file within it.
 - Make them genuinely different from each other, not rewordings."""
 
