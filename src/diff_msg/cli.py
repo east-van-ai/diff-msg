@@ -1,11 +1,11 @@
 """
 # ==============================================
 # East Van AI -- AI for the rest of us!
-# https://github.com/east-van-ai
+# https://github.com/east-van-ai/diff-msg
 # contact: east-van-ai@proton.me
 # ==============================================
 #
-# ~~~ ~~~ ~~~ ~~~ ~~~ diff-msg ~~~ ~~~ ~~~ ~~~ ~~~
+# ~~~ ~~~ ~~~ ~~~ ~~~ ~~~ ~~~ ~~~ diff-msg ~~~ ~~~ ~~~ ~~~ ~~~ ~~~ ~~~ ~~~
 #
 # Suggest five commit titles for a branch by feeding `git diff main...` to a
 # locally running Ollama model. No cloud calls, no API keys -- everything
@@ -44,7 +44,7 @@ import sys
 
 from . import args, cli_ask
 
-USAGE = "Usage: diff-msg ask PATH"
+VERSION_USAGE = "Usage: diff-msg version"
 
 
 def leading_paths(tokens):
@@ -61,8 +61,7 @@ def piped_stdin():
     """Return True when stdin carries content the user sent.
 
     Deliberately narrower than `not isatty()`, which is also false for the
-    /dev/null that cron, nohup, and CI hand a process. See DESIGN.md, No
-    piped input.
+    /dev/null that cron, nohup, and CI hand a process.
     """
     if sys.stdin is None:
         return False
@@ -75,31 +74,34 @@ def piped_stdin():
     return stat.S_ISFIFO(mode) or stat.S_ISREG(mode) or stat.S_ISSOCK(mode)
 
 
-def usage_error(message):
-    """Report a command line the tool could not read, with its usage."""
+def usage_error(usage, message):
+    """Report a command line the tool could not read, with the matching usage."""
     print(f"diff-msg: {message}", file=sys.stderr)
-    print(USAGE, file=sys.stderr)
+    print(usage, file=sys.stderr)
     return args.EXIT_ERROR
 
 
 def main():
     """Read the command slots, enforce the grammar, and run the command."""
-    if piped_stdin():
-        return usage_error("diff-msg reads no piped input")
+    command = sys.argv[1] if len(sys.argv) > 1 else None
 
-    if len(sys.argv) == 1:
+    # ask is the only command that reads input, so its usage answers all but version.
+    if piped_stdin():
+        usage = VERSION_USAGE if command == "version" else cli_ask.USAGE
+        return usage_error(usage, "diff-msg reads no piped input")
+
+    if command is None:
         print(__doc__)
         return args.EXIT_OK
 
-    command = sys.argv[1]
     paths = leading_paths(sys.argv[2:])
 
     # Strays are named here, ahead of the parser, so they stay diff-msg's own
     # error at exit 1 rather than argparse's "unrecognized arguments" at 2.
     if command == "ask" and len(paths) > 1:
-        return usage_error(f"unexpected argument: {paths[1]}")
+        return usage_error(cli_ask.USAGE, f"unexpected argument: {paths[1]}")
     if command == "version" and paths:
-        return usage_error(f"version takes no arguments: {paths[0]}")
+        return usage_error(VERSION_USAGE, f"version takes no arguments: {paths[0]}")
 
     # Rejects an unknown command or flag at exit 2, and answers --version on
     # the way past. What it resolved is discarded: the slots decide.
@@ -115,7 +117,7 @@ def main():
         return args.EXIT_OK
 
     if not paths:
-        return usage_error("ask needs a PATH")
+        return usage_error(cli_ask.USAGE, "ask needs a PATH")
 
     return cli_ask.run(paths[0])
 

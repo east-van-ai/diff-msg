@@ -6,6 +6,20 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+## [0.5.2] - 2026-09-17
+
+### Changed
+
+- `DESIGN.md` moves to `docs/DESIGN.md`
+- the command surface splits out into `docs/CLI.md`: the grammar, the
+  exit codes, and what `ask` prints
+- `version` and `--version` are documented, in `docs/CLI.md`
+- the banner and the `ask` docs link to the project repository
+
+### Fixed
+
+- a usage error under `version` prints `version`'s usage line, not `ask`'s
+
 ## [0.5.1] - 2026-09-02
 
 ### Changed

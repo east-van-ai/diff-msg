@@ -95,7 +95,10 @@ def test_both_version_spellings_print_the_same_line(run_cli):
 def test_version_takes_no_argument(call_main, capsys, no_git):
     """`version` acts on its own, so a word after it is a stray: exit 1."""
     assert call_main(["version", "extra"]) == 1
-    assert "extra" in capsys.readouterr().err
+    err = capsys.readouterr().err
+    assert "extra" in err
+    assert "Usage: diff-msg version" in err
+    assert "ask PATH" not in err
 
 
 def test_version_flag_answers_before_the_command_runs(call_main, capsys, no_git):
@@ -112,6 +115,22 @@ def test_piped_stdin_is_a_usage_error(run_cli):
     result = run_cli(["ask", "."], input_text="a diff\n")
     assert result.returncode == 1
     assert "diff-msg:" in result.stderr
+    assert "Usage: diff-msg ask PATH" in result.stderr
+    assert result.stdout == ""
+
+
+def test_piped_stdin_under_version_prints_version_usage(run_cli):
+    """The usage line belongs to the command typed, not to ask."""
+    result = run_cli(["version"], input_text="a diff\n")
+    assert result.returncode == 1
+    assert "Usage: diff-msg version" in result.stderr
+    assert "ask PATH" not in result.stderr
+
+
+def test_piped_stdin_under_bare_prints_ask_usage(run_cli):
+    """With no command typed, ask's line says where input goes."""
+    result = run_cli([], input_text="a diff\n")
+    assert result.returncode == 1
     assert "Usage: diff-msg ask PATH" in result.stderr
     assert result.stdout == ""
 

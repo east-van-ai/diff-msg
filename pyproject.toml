@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "diff-msg"
-version = "0.5.1"
-description = "Generate a conventional commit title from your branch diff using a local Ollama model."
+version = "0.5.2"
+description = "Suggest five commit titles for a branch diff using a local Ollama model."
 readme = "README.md"
 requires-python = ">=3.9"
 license = { text = "MIT" }

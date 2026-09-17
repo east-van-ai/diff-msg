@@ -3,8 +3,7 @@ Unit tests for the prompt-building layer, the output shape, and the
 local-only constants.
 
 These cover what diff-msg builds and prints, which is its own and
-deterministic. Nothing here checks the model's judgment; see DESIGN.md,
-Enforced Shape.
+deterministic. Nothing here checks the model's judgment.
 """
 
 import json
@@ -45,7 +44,7 @@ def test_prompt_carries_the_content_rules():
 
 
 def test_prompt_states_the_length_range():
-    """Both ends are asked for, not only enforced. See DESIGN.md."""
+    """Both ends are asked for, not only enforced."""
     prompt = build_prompt("main", "some diff")
     assert str(MIN_LENGTH) in prompt
     assert str(MAX_LENGTH) in prompt

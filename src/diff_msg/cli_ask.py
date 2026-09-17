@@ -1,5 +1,7 @@
 """
-# ~~~ diff-msg ask ~~~
+# ~~~ ~~~ ~~~ ~~~ ~~~ ~~~ ~~~ ~~~ diff-msg ask ~~~ ~~~ ~~~ ~~~ ~~~ ~~~ ~~~ ~~~
+#
+# https://github.com/east-van-ai/diff-msg
 #
 # Read the branch name and `git diff main...` in the checkout at PATH, ask
 # the local model, and print five one-line commit-title suggestions.
@@ -22,11 +24,12 @@ import requests
 
 from .args import EXIT_ERROR, EXIT_OK
 
+USAGE = "Usage: diff-msg ask PATH"
+
 OLLAMA_URL = "http://localhost:11434/api/generate"
 MODEL = "hf.co/CohereLabs/tiny-aya-global-GGUF:Q4_K_M"
 
 # Hot, because the point is a different set of ideas each run.
-# See DESIGN.md, Sampling.
 TEMPERATURE = 0.8
 
 SUGGESTION_COUNT = 5
@@ -34,7 +37,6 @@ MIN_LENGTH = 60
 MAX_LENGTH = 120
 
 # The output contract, enforced by Ollama rather than requested in prose.
-# See DESIGN.md, Enforced Shape.
 SCHEMA = {
     "type": "object",
     "properties": {
@@ -54,8 +56,7 @@ SCHEMA = {
 
 # The count and the absence of fences are the schema's job. Both ends of the
 # length range appear here as well, since maxLength clips rather than
-# shortens and minLength cannot be met by clipping at all. See DESIGN.md,
-# Enforced Shape.
+# shortens and minLength cannot be met by clipping at all.
 RULES = f"""Rules:
 - Write one line, between {MIN_LENGTH} and {MAX_LENGTH} characters.
 - A full sentence naming what changed, not a label or a branch name.

@@ -81,67 +81,6 @@ disagree, so only `ruff check` runs here. Ruff gets no configuration in
 this project, because the pinned version is the rule set. That is what
 the exact pin buys.
 
-## CLI Grammar
-
-`diff-msg ask PATH`.
-
-The command word sits at `argv[1]` and its argument at `argv[2]`, and both
-are read off those slots directly. Since Python 3.12 argparse back-fills a
-trailing positional from a token appearing after any number of flags.
-That makes `diff-msg ask --flag PATH` parse happily, and the accepted
-grammar drifts away from the documented one. Reading the slots decides the shape instead
-of inferring it. A second bare word after PATH is a stray, named by
-diff-msg itself at exit 1 rather than left to argparse.
-
-A bare word is a question, and documentation is the answer. Bare
-`diff-msg` prints the module docstring and exits 0. Bare `diff-msg ask`
-prints the ask documentation and exits 0. The token count alone decides
-that. Once any other token is present the user asked for something
-specific, and answering with help would hide the mistake, so a missing
-PATH there is an error at exit 1.
-
-Doing the work costs a command word. A bare invocation is harmless, and
-shelling out to git and querying a model is asked for by name.
-
-`ask` takes the directory to work in, and `diff-msg ask .` is the current
-one. Git's answer depends on which repository it is standing in, so that
-choice is stated on the command line rather than left ambient. A PATH that
-is not a directory is a readiness failure: exit 1, and no usage line,
-because the grammar was fine and what the run needed was not there. A
-directory that is not a checkout is git's own message passed through. See
-Git Failures.
-
-### No piped input
-
-`diff-msg` reads nothing from stdin. Its input is git, in the directory it
-was pointed at, and there is no second source. `ask PATH` already covers
-working on a checkout you are not standing in, which is the reach a piped
-diff would have bought.
-
-Any run with piped stdin is therefore a usage error, exit 1, whatever the
-command word. A diff sent down a pipe was sent to be read. Printing help
-at exit 0 instead would drop it in silence and report success.
-
-Piped is decided by stdin's file type, never by `isatty()`. A pipe, a
-redirect, and a socket carry content. A character device does not, and
-that is where `isatty()` goes wrong: it is false for `/dev/null` too,
-which cron, systemd, `nohup`, and CI hand a process. Deciding on
-`isatty()` alone would make one command line answer two ways depending on
-how it was launched, and a test for it would then pass or fail with the
-launch context rather than with the code.
-
-Exit codes:
-
-- `0`: success. Suggestions printed, "no changes" reported, or documentation
-        printed.
-- `1`: every error diff-msg raises itself: usage errors, a PATH that is
-        not a directory, a git failure, and an unreachable Ollama.
-- `2`: argparse's own errors (unknown command, unknown flag), argparse's
-        convention, left untouched.
-
-All self-raised errors go to stderr as `diff-msg: <message>`. Usage errors
-additionally print the usage line. Readiness failures do not.
-
 ## Sampling
 
 The same diff should produce a different set of suggestions on every run.
@@ -156,17 +95,17 @@ The model stays fixed at `tiny-aya-global`, Cohere's 3.35b, at Q4_K_M. A
 3b model on an 8 GB machine answers in seconds, where an 8b model against a
 large diff spends its time swapping. Comprehension is genuinely better at
 8b, and it is still the wrong trade when a whole diff has to fit in memory
-beside it. There is no configuration surface yet; changing the model means
-editing one constant.
+beside it.
 
 Several 3b models clear that bar, so the size class does not settle which
 one. Cohere is Canadian, and a tool that runs entirely on the machine in
 front of it may as well run a model from home. That is the reason.
 
-What the swap gives up and gains is worth recording next to it. The code
-model reads code better. Against that, on the branch both were asked about,
-`tiny-aya-global` carried the repository's name correctly through all five
-suggestions where the code model never named the project at all. A small
+What the choice gives up and gains is worth recording next to it. A code
+model such as `qwen2.5-coder:3b` reads code better. Against that, on a
+branch both were asked about, `tiny-aya-global` carried the repository's
+name correctly through all five suggestions where the code model never
+named the project at all. A small
 model can return an identifier subtly misspelled, close enough to read as
 correct at a glance, and the suggestions here are read by someone who knows
 the branch. A wrong name is the one error that survives that reading. One
@@ -175,12 +114,13 @@ argument.
 
 The cost is voice. `tiny-aya-global` writes noun phrases by default,
 "Refactoring the converter" where the log wants "Refactor the converter",
-so the prompt now asks for the imperative.
+so the prompt asks for the imperative.
 
 ## The Pipeline
 
-`main()` runs: read the command slots -> grammar guards (bare word,
-stdin, PATH) -> `get_branch` -> `get_diff` -> empty-diff early exit ->
+`main()` reads the command slots and runs the grammar guards (stdin, bare
+word, strays, missing PATH), then hands PATH to `cli_ask.run()`. That runs:
+directory check -> `get_branch` -> `get_diff` -> empty-diff early exit ->
 `build_prompt` -> `ask_ollama` -> `format_suggestions` -> print.
 
 - `run_git` runs one git command via `subprocess` and hands back its stdout.
@@ -253,36 +193,16 @@ result, and a tool that claims success when it never ran is worse than
 one that stops. Git already words each case well, so restating that
 classification in Python would only let the two drift apart.
 
-Two git outcomes are not failures, and both exit 0. An empty diff means
-there is nothing to commit, so `ask` says "No changes vs main." without
-ever contacting the model. A detached HEAD has no branch name to print,
-so the branch name is simply empty and the diff carries the signal on its
-own.
-
-## Output Shape
-
-Five numbered suggestions on stdout, and nothing else:
-
-```text
-1. Simplify the conversion logic and remove the comments that no longer apply
-2. Rewrite the converter to drop the intermediate representation entirely
-3. Collapse the three conversion branches into a single code path
-4. Tidy the converter and bring its comments back in line with the code
-5. Remove the stale conversion comments and shorten the surrounding logic
-```
-
-One line each, between 60 and 120 characters, all guaranteed by the schema.
-See Enforced Shape. No prefix and no scope, since a suggestion is a plain
-sentence. Casing is not enforced, though the prompt's imperative examples
-tend to draw a capital.
-
-A body is not part of this shape. The whole reply is titles.
+Two git outcomes are not failures. An empty diff means there is nothing
+to commit, so `ask` reports that and never contacts the model. A detached
+HEAD has no branch name to print, so the branch name is simply empty and
+the diff carries the signal on its own.
 
 ## Use of AI
 
 Both the use of AI and its disclosure are deliberate. Code and
 documentation in this project are written in collaboration with
-Artificial Intelligence (AI). The division of labor: the AI explores,
+Artificial Intelligence (AI). The division of labour: the AI explores,
 challenges assumptions and edge cases, and drafts; the human
 initiates, drafts the designs, explores alongside the AI, reviews
 every change, and decides what gets committed.
