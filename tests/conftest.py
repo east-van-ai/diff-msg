@@ -2,12 +2,24 @@
 Shared fixtures and helpers for diff_msg tests.
 """
 
+import os
 import subprocess
 import sys
 
 import pytest
 
 from diff_msg import cli
+
+
+@pytest.fixture(autouse=True)
+def isolated_git_config(monkeypatch):
+    """Run every git a test starts without the machine's global or system config.
+
+    A global hook, commit signing, or diff setting would otherwise leak into
+    the throwaway repos and into the `git diff` that `ask` reads.
+    """
+    monkeypatch.setenv("GIT_CONFIG_GLOBAL", os.devnull)
+    monkeypatch.setenv("GIT_CONFIG_NOSYSTEM", "1")
 
 
 @pytest.fixture

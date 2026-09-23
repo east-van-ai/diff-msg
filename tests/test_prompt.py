@@ -8,7 +8,10 @@ deterministic. Nothing here checks the model's judgment.
 
 import json
 
-from diff_msg import cli_ask
+import pytest
+import requests
+
+from diff_msg import cli_ask, errors
 from diff_msg.cli_ask import (
     MAX_LENGTH,
     MIN_LENGTH,
@@ -111,18 +114,25 @@ def test_request_sends_the_schema_and_no_seed(monkeypatch):
     assert "seed" not in sent["options"]
 
 
-def test_unusable_reply_is_a_diff_msg_error(monkeypatch, capsys):
-    """A reply that escapes the schema exits 1, not with a traceback."""
+def test_unusable_reply_raises_a_runtime_failure(monkeypatch):
+    """A reply that escapes the schema raises for main to report, not a traceback."""
     monkeypatch.setattr(
         cli_ask.requests, "post", lambda url, json: _FakeResponse("not json at all")
     )
-    try:
+    with pytest.raises(errors.RuntimeFailure, match="the model returned an unusable"):
         cli_ask.ask_ollama("a prompt")
-    except SystemExit as exit_info:
-        assert exit_info.code == 1
-    else:
-        raise AssertionError("expected SystemExit")
-    assert "diff-msg: the model returned an unusable reply" in capsys.readouterr().err
+
+
+def test_unreachable_ollama_raises_readiness(monkeypatch):
+    """A refused connection is a missing prerequisite, raised for main to report."""
+
+    def refuse(url, json):
+        """Fail the way requests does when nothing listens on the port."""
+        raise requests.ConnectionError("refused")
+
+    monkeypatch.setattr(cli_ask.requests, "post", refuse)
+    with pytest.raises(errors.ReadinessError, match="cannot reach Ollama"):
+        cli_ask.ask_ollama("a prompt")
 
 
 def test_reply_is_parsed_into_a_list(monkeypatch):

@@ -41,10 +41,41 @@
 import os
 import stat
 import sys
+from collections import namedtuple
 
-from . import args, cli_ask
+from diff_msg import args, cli_ask, errors
 
-VERSION_USAGE = "Usage: diff-msg version"
+# 2 never returns through main(). Argparse's own ArgumentParser.error() and
+# the version action both call sys.exit() and unwind past it.
+EXIT_OK = 0
+EXIT_ERROR = 1
+EXIT_ARGPARSE = 2
+
+__all__ = ["EXIT_ARGPARSE", "EXIT_ERROR", "EXIT_OK", "main"]
+
+Command = namedtuple("Command", "bare usage slots action")
+"""A command word's answer to being typed alone, its usage line, the path slots it
+reads, and the action a full invocation runs.
+
+`bare` returns the text for the bare word; `action` runs the command. For `version`,
+both read from `version_line`, since running the command answers the bare word.
+"""
+
+
+COMMANDS = {
+    "ask": Command(
+        lambda: cli_ask.__doc__,
+        cli_ask.USAGE,
+        cli_ask.SLOTS,
+        lambda paths: cli_ask.run(*paths),
+    ),
+    "version": Command(
+        args.version_line,
+        "diff-msg version",
+        (),
+        lambda paths: print(args.version_line()),
+    ),
+}
 
 
 def leading_paths(tokens):
@@ -77,49 +108,75 @@ def piped_stdin():
 def usage_error(usage, message):
     """Report a command line the tool could not read, with the matching usage."""
     print(f"diff-msg: {message}", file=sys.stderr)
-    print(usage, file=sys.stderr)
-    return args.EXIT_ERROR
+    print(f"Usage: {usage}", file=sys.stderr)
+    return EXIT_ERROR
 
 
-def main():
-    """Read the command slots, enforce the grammar, and run the command."""
-    command = sys.argv[1] if len(sys.argv) > 1 else None
+def readiness_error(message):
+    """Report what the run needed and did not find, with no usage line."""
+    sys.stdout.flush()
+    print(f"diff-msg: {message}", file=sys.stderr)
+    return EXIT_ERROR
+
+
+def runtime_error(message):
+    """Report an answer the run could not use, with no usage line."""
+    sys.stdout.flush()
+    print(f"diff-msg: {message}", file=sys.stderr)
+    return EXIT_ERROR
+
+
+def main(argv=None):
+    """Parse arguments, run the matching command, return an exit code."""
+    tokens = list(sys.argv[1:] if argv is None else argv)
 
     # ask is the only command that reads input, so its usage answers all but version.
     if piped_stdin():
-        usage = VERSION_USAGE if command == "version" else cli_ask.USAGE
+        word = tokens[0] if tokens else None
+        usage = COMMANDS[word].usage if word in COMMANDS else cli_ask.USAGE
         return usage_error(usage, "diff-msg reads no piped input")
 
-    if command is None:
+    if not tokens:
         print(__doc__)
-        return args.EXIT_OK
-
-    paths = leading_paths(sys.argv[2:])
-
-    # Strays are named here, ahead of the parser, so they stay diff-msg's own
-    # error at exit 1 rather than argparse's "unrecognized arguments" at 2.
-    if command == "ask" and len(paths) > 1:
-        return usage_error(cli_ask.USAGE, f"unexpected argument: {paths[1]}")
-    if command == "version" and paths:
-        return usage_error(VERSION_USAGE, f"version takes no arguments: {paths[0]}")
-
-    # Rejects an unknown command or flag at exit 2, and answers --version on
-    # the way past. What it resolved is discarded: the slots decide.
-    args.build_parser().parse_args()
-
-    if command == "version":
-        print(args.version_line())
-        return args.EXIT_OK
+        return EXIT_OK
 
     # A command word and nothing else is a question, and its own docs answer.
-    if len(sys.argv) == 2:
-        print(cli_ask.__doc__)
-        return args.EXIT_OK
+    if len(tokens) == 1 and tokens[0] in COMMANDS:
+        print(COMMANDS[tokens[0]].bare())
+        return EXIT_OK
 
-    if not paths:
-        return usage_error(cli_ask.USAGE, "ask needs a PATH")
+    parser = args.build_parser()
+    parsed, extras = parser.parse_known_args(tokens)
 
-    return cli_ask.run(paths[0])
+    if any(extra.startswith("-") for extra in extras):
+        parser.parse_args(tokens)  # argparse names the flag better, exit 2
+
+    paths = leading_paths(tokens[1:])
+
+    command = COMMANDS[parsed.command]
+
+    if len(paths) < len(command.slots):
+        needed = " and ".join(command.slots)
+        if len(command.slots) > 1:
+            needed = f"both {needed}"
+        return usage_error(command.usage, f"{parsed.command} needs {needed}")
+
+    if len(paths) > len(command.slots):
+        stray = paths[len(command.slots)]
+        last = command.slots[-1] if command.slots else "it"
+        return usage_error(
+            command.usage,
+            f"{parsed.command} takes nothing after {last}: {stray!r}",
+        )
+
+    try:
+        command.action(paths)
+    except errors.ReadinessError as failure:
+        return readiness_error(str(failure))
+    except errors.RuntimeFailure as failure:
+        return runtime_error(str(failure))
+
+    return EXIT_OK
 
 
 if __name__ == "__main__":

@@ -10,7 +10,8 @@ trailing positional from a token appearing after any number of flags. That
 makes `diff-msg ask --flag PATH` parse happily, and the accepted grammar
 drifts away from the documented one. Reading the slots decides the shape
 instead of inferring it. A second bare word after PATH is a stray, named by
-diff-msg itself at exit 1 rather than left to argparse.
+diff-msg itself at exit 1 rather than left to argparse. An unknown flag is
+checked first. Argparse names it at exit 2, even with a stray beside it.
 
 A bare word is a question, and documentation is the answer. Bare
 `diff-msg` prints the module docstring and exits 0. Bare `diff-msg ask`
@@ -74,16 +75,17 @@ change rather than a setting. See DESIGN's Sampling section for which model
 and why.
 
 The base branch is fixed too. `ask` diffs against `main`, and a checkout
-that calls its trunk something else is not covered yet.
+that calls its trunk something else is not covered.
 
 ## Exit codes
 
 - `0`: success. Suggestions printed, "no changes" reported, or
-        documentation printed.
+  documentation printed.
 - `1`: every error diff-msg raises itself: usage errors, a PATH that is not
-        a directory, a git failure, and an unreachable Ollama.
+  a directory, a git failure, an unreachable Ollama, and a reply that
+  escapes the schema.
 - `2`: argparse's own errors (unknown command, unknown flag), argparse's
-        convention, left untouched.
+  convention, left untouched.
 
 All self-raised errors go to stderr as `diff-msg: <message>`. Usage errors
 additionally print the usage line of the command that failed, so a stray
@@ -115,19 +117,18 @@ A body is not part of this shape. The whole reply is titles.
 The set changes on every run, deliberately. Asking twice about the same
 diff gives two different sets.
 
-Two cases print something else, and both exit 0. An empty diff prints "No
-changes vs main. Nothing to commit." without ever contacting the model. A
-detached HEAD has no branch name, and the diff carries the signal on its
-own.
+An empty diff prints something else, and still exits 0: "No changes vs
+main. Nothing to commit." The model is never contacted. A detached HEAD is
+not a special case. It has no branch name, the diff carries the signal on
+its own, and the five suggestions print as usual.
 
 ## Use of AI
 
-Both the use of AI and its disclosure are deliberate. Code and
-documentation in this project are written in collaboration with
-Artificial Intelligence (AI). The division of labour: the AI explores,
-challenges assumptions and edge cases, and drafts; the human
-initiates, drafts the designs, explores alongside the AI, reviews
-every change, and decides what gets committed.
+Both the use of AI and its disclosure are deliberate. Code and documentation in
+this project are written in collaboration with Artificial Intelligence (AI). The
+division of labour: the AI explores, challenges assumptions and edge cases, and
+drafts; the human initiates, drafts the designs, explores alongside the AI,
+reviews every change, and decides what gets committed.
 
 ---
 

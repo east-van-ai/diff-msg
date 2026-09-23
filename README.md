@@ -49,7 +49,15 @@ example output:
 
 ## Requirements
 
+- Python 3.9 or newer
+- pipx
 - [Ollama](https://ollama.com) running locally
+
+## Install
+
+```bash
+pipx install "git+https://github.com/east-van-ai/diff-msg.git"
+```
 
 ## Setup
 
@@ -57,18 +65,9 @@ example output:
 ollama pull hf.co/CohereLabs/tiny-aya-global-GGUF:Q4_K_M
 ```
 
-## Install
-
-- Python 3.9 or newer
-- pipx
-
-```bash
-pipx install "git+https://github.com/east-van-ai/diff-msg.git"
-```
-
 ## Model
 
-default: `tiny-aya-global` (CC-BY-NC 4.0)
+`tiny-aya-global` (CC-BY-NC 4.0)
 
 Cohere's small multilingual model, Canadian like the rest of this. The
 licence is non-commercial. Use it, read it, take it apart. Don't sell it,
@@ -81,10 +80,8 @@ No API keys. No cloud. Nothing for your manager to worry about.
 
 ## Use of AI
 
-This project is built with Artificial Intelligence (AI), deliberately
-and in the open. Code and documentation are written in collaboration
-with remote and local AI; design decisions, code review, and final
-judgement stay human.
+Code and documentation are written in collaboration with remote and local AI; design
+decisions, code review, semantic and auditory review, and final judgement stay human.
 
 ---
 

@@ -59,7 +59,14 @@ def test_ask_with_a_stray_second_word_is_an_error(call_main, capsys, no_git):
     err = capsys.readouterr().err
     assert err.startswith("diff-msg: ")
     assert "extra" in err
-    assert "Usage: diff-msg ask PATH" in err
+    assert err.splitlines()[-1] == "Usage: diff-msg ask PATH"
+
+
+def test_ask_stray_names_the_last_slot(call_main, capsys, no_git):
+    """The stray message comes from SLOTS, so it names what the word follows."""
+    assert call_main(["ask", ".", "extra"]) == 1
+    err = capsys.readouterr().err
+    assert err.splitlines()[0] == "diff-msg: ask takes nothing after PATH: 'extra'"
 
 
 def test_ask_on_a_file_is_a_readiness_failure(call_main, capsys, tmp_path, no_git):
@@ -97,7 +104,7 @@ def test_version_takes_no_argument(call_main, capsys, no_git):
     assert call_main(["version", "extra"]) == 1
     err = capsys.readouterr().err
     assert "extra" in err
-    assert "Usage: diff-msg version" in err
+    assert err.splitlines()[-1] == "Usage: diff-msg version"
     assert "ask PATH" not in err
 
 

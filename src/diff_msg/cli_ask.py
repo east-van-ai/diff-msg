@@ -18,13 +18,14 @@
 import json
 import os
 import subprocess
-import sys
 
 import requests
 
-from .args import EXIT_ERROR, EXIT_OK
+from diff_msg import errors
 
-USAGE = "Usage: diff-msg ask PATH"
+HELP = "Suggest five commit titles."
+USAGE = "diff-msg ask PATH"
+SLOTS = ("PATH",)
 
 OLLAMA_URL = "http://localhost:11434/api/generate"
 MODEL = "hf.co/CohereLabs/tiny-aya-global-GGUF:Q4_K_M"
@@ -67,7 +68,7 @@ RULES = f"""Rules:
 
 
 def run_git(args, cwd):
-    """Run a git command in cwd and return its stdout, or exit 1 if git failed.
+    """Run a git command in cwd and return its stdout, or raise if git failed.
 
     The return code decides, not the output: stdout alone cannot tell a
     failure from an empty result. The first line of git's own message is
@@ -80,8 +81,7 @@ def run_git(args, cwd):
         stderr = result.stderr.strip()
         first_line = stderr.splitlines()[0] if stderr else ""
         message = first_line.removeprefix("fatal: ") or f"git {args[0]} failed"
-        print(f"diff-msg: {message}", file=sys.stderr)
-        sys.exit(1)
+        raise errors.ReadinessError(message)
     return result.stdout.strip()
 
 
@@ -101,7 +101,7 @@ def ask_ollama(prompt):
     The request carries SCHEMA, so the reply is constrained to an array of
     five capped strings. No seed is sent, so the same diff gives a different
     set every run. An unreachable Ollama, or a reply that somehow escapes
-    the schema, is a diff-msg error (exit 1), not a traceback.
+    the schema, raises for main to report, not a traceback.
     """
     try:
         response = requests.post(
@@ -115,14 +115,12 @@ def ask_ollama(prompt):
             },
         )
     except requests.RequestException as e:
-        print(f"diff-msg: cannot reach Ollama at {OLLAMA_URL}: {e}", file=sys.stderr)
-        sys.exit(1)
+        raise errors.ReadinessError(f"cannot reach Ollama at {OLLAMA_URL}: {e}") from e
 
     try:
         return json.loads(response.json()["response"])["suggestions"]
     except (json.JSONDecodeError, KeyError, TypeError) as e:
-        print(f"diff-msg: the model returned an unusable reply: {e}", file=sys.stderr)
-        sys.exit(1)
+        raise errors.RuntimeFailure(f"the model returned an unusable reply: {e}") from e
 
 
 def build_prompt(branch, diff):
@@ -150,19 +148,17 @@ def format_suggestions(suggestions):
 def run(path):
     """Print five suggestions for the checkout at path.
 
-    A path that is not a directory is a readiness failure, so it exits 1
-    with no usage line: the grammar was fine and the run's ground was not.
+    A path that is not a directory is a readiness failure, reported with no
+    usage line: the grammar was fine and the run's ground was not.
     """
     if not os.path.isdir(path):
-        print(f"diff-msg: not a directory: {path}", file=sys.stderr)
-        return EXIT_ERROR
+        raise errors.ReadinessError(f"not a directory: {path}")
 
     branch = get_branch(path)
     diff = get_diff(path)
 
     if not diff:
         print("No changes vs main. Nothing to commit.")
-        return EXIT_OK
+        return
 
     print(format_suggestions(ask_ollama(build_prompt(branch, diff))))
-    return EXIT_OK

@@ -1,19 +1,15 @@
 """
-The command line's vocabulary: the parser, the exit codes, and the version
-line. Nothing here does any work.
+The command line's vocabulary: the parser and the version line. Nothing
+here does any work.
 """
 
 import argparse
 from importlib import metadata
 
+from diff_msg import cli_ask
+
 PROG = "diff-msg"
 DIST = "diff-msg"
-
-# 2 never returns through main(). Argparse's own ArgumentParser.error() and
-# the version action both call sys.exit() and unwind past it.
-EXIT_OK = 0
-EXIT_ERROR = 1
-EXIT_ARGPARSE = 2
 
 
 def installed_version():
@@ -56,7 +52,7 @@ def build_parser():
 
     # Optional, so a bare `diff-msg ask` reaches the bare-word rule in
     # cli.py rather than dying as a missing positional at exit 2.
-    ask = subparsers.add_parser("ask", help="suggest five commit titles")
+    ask = subparsers.add_parser("ask", help=cli_ask.HELP, description=cli_ask.HELP)
     ask.add_argument("path", nargs="?", help="the git checkout to read")
 
     subparsers.add_parser("version", help="print the installed version")

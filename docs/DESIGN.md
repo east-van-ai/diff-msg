@@ -33,9 +33,9 @@ surface, the install path assumes a current pip, and releases are
 internal.
 
 One limit is worth stating here rather than leaving a reader to find it.
-A diff that is mostly prose is outside what this can do. The model
+A diff that is mostly prose is outside what this can do. A 3b model
 follows the text it finds inside the diff instead of describing it, and
-no prompt wording fixes that at the size of model this runs on.
+no prompt wording tried so far has fixed that at this size.
 
 ## Architecture
 
@@ -44,16 +44,22 @@ no prompt wording fixes that at the size of model this runs on.
 against `localhost:11434`. No cloud calls, no API keys, and no code
 leaves the machine.
 
-The implementation is three modules under `src/diff_msg/`. `args.py`
+The implementation is four modules under `src/diff_msg/`. `args.py`
 holds the command line's vocabulary, `cli_ask.py` holds the `ask` command
-and the pipeline it runs, and `cli.py` is the entry point that reads the
-command line and hands off. Pure functions with one job each, and data
+and the pipeline it runs, and `errors.py` holds the failures a run can
+raise. `cli.py` is the entry point that reads the command line, hands off,
+and owns the exit codes. Pure functions with one job each, and data
 that is plain strings. The only state read is the git repository `ask`
 was pointed at, and the only external service is the local model.
 
 The split keeps the entry point small. An entry point that also holds a
 command's work grows without bound, and the command line is the part that
 has to stay readable.
+
+A usage constant holds only its command's grammar, `diff-msg ask PATH`.
+The `Usage:` prefix is added by `usage_error()`, the one function that
+prints it. It is the same on every usage line, so it is formatting rather
+than grammar.
 
 No module carries a shebang. They are reached through the console script
 or `python -m diff_msg.cli`, never by executing a file directly.
@@ -105,12 +111,11 @@ What the choice gives up and gains is worth recording next to it. A code
 model such as `qwen2.5-coder:3b` reads code better. Against that, on a
 branch both were asked about, `tiny-aya-global` carried the repository's
 name correctly through all five suggestions where the code model never
-named the project at all. A small
-model can return an identifier subtly misspelled, close enough to read as
-correct at a glance, and the suggestions here are read by someone who knows
-the branch. A wrong name is the one error that survives that reading. One
-branch is thin evidence, so this is an observation, not the deciding
-argument.
+named the project at all. A small model can return an identifier subtly
+misspelled, close enough to read as correct at a glance, and the
+suggestions here are read by someone who knows the branch. A wrong name is
+the one error that survives that reading. One branch is thin evidence, so
+this is an observation, not the deciding argument.
 
 The cost is voice. `tiny-aya-global` writes noun phrases by default,
 "Refactoring the converter" where the log wants "Refactor the converter",
@@ -118,8 +123,16 @@ so the prompt asks for the imperative.
 
 ## The Pipeline
 
-`main()` reads the command slots and runs the grammar guards (stdin, bare
-word, strays, missing PATH), then hands PATH to `cli_ask.run()`. That runs:
+`main()` dispatches through a command table. Each command word, `version`
+included, has one row: what the bare word prints, its usage line, the path
+slots it reads, and its action. Each command module supplies its own
+`HELP`, `USAGE`, and `SLOTS`, so a new command is one module and one row.
+The grammar guards run in order: piped stdin, bare `diff-msg`, a bare
+command word, unknown flags, then missing PATH and strays, counted against
+`SLOTS`. A command module never prints an error or exits. It raises
+`ReadinessError` or `RuntimeFailure`, and `main()` alone prints
+`diff-msg: <message>` and returns exit 1, so nothing exits past it. The
+`ask` row hands PATH to `cli_ask.run()`. That runs:
 directory check -> `get_branch` -> `get_diff` -> empty-diff early exit ->
 `build_prompt` -> `ask_ollama` -> `format_suggestions` -> print.
 
@@ -133,7 +146,8 @@ directory check -> `get_branch` -> `get_diff` -> empty-diff early exit ->
 - `ask_ollama` POSTs to the local `/api/generate` endpoint and returns the five
   strings. An unreachable Ollama is reported as
   `diff-msg: cannot reach Ollama ...` on stderr (exit 1), not a `requests`
-  traceback.
+  traceback. A reply that escapes the schema is reported the same way, as
+  `diff-msg: the model returned an unusable reply ...`.
 - `format_suggestions` numbers the list for printing.
 
 ## Enforced Shape
@@ -200,12 +214,11 @@ the diff carries the signal on its own.
 
 ## Use of AI
 
-Both the use of AI and its disclosure are deliberate. Code and
-documentation in this project are written in collaboration with
-Artificial Intelligence (AI). The division of labour: the AI explores,
-challenges assumptions and edge cases, and drafts; the human
-initiates, drafts the designs, explores alongside the AI, reviews
-every change, and decides what gets committed.
+Both the use of AI and its disclosure are deliberate. Code and documentation in
+this project are written in collaboration with Artificial Intelligence (AI). The
+division of labour: the AI explores, challenges assumptions and edge cases, and
+drafts; the human initiates, drafts the designs, explores alongside the AI,
+reviews every change, and decides what gets committed.
 
 ---
 

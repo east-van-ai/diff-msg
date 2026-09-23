@@ -6,6 +6,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+## [0.5.3] - 2026-09-23
+
+### Changed
+
+- a stray word names what it follows: `ask takes nothing after PATH: 'extra'`
+- an unknown flag is argparse's error at exit 2, even beside a stray word
+
 ## [0.5.2] - 2026-09-17
 
 ### Changed
